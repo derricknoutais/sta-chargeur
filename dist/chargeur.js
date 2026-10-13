@@ -139,9 +139,9 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
             planifier();
         };
     }
-    function suivre(promesse_1, message_1) {
-        return __awaiter(this, arguments, void 0, function* (promesse, message, mode = 'pastille') {
-            const fin = attendre(mode, { message });
+    function suivre(promesse_1, attente_1) {
+        return __awaiter(this, arguments, void 0, function* (promesse, attente, mode = 'pastille') {
+            const fin = attendre(mode, typeof attente === 'string' ? { message: attente } : attente || {});
             try {
                 return yield promesse;
             }
@@ -273,7 +273,8 @@ export function chargeur(options) {
  * appel qu'aucun branchement ne voit passer. Rend la promesse telle quelle.
  *
  *     const r = await suivre(fetch(`/recherche?q=${q}`), 'Recherche…');
+ *     await suivre(rafraichir(), { message: 'Synchronisation…', detail: 'Ne quittez pas.' }, 'voile');
  */
-export function suivre(promesse, message, mode = 'pastille') {
-    return chargeur().suivre(promesse, message, mode);
+export function suivre(promesse, attente, mode = 'pastille') {
+    return chargeur().suivre(promesse, attente, mode);
 }

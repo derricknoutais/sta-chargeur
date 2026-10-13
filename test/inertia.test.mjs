@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { arreterHorloge, avancer, horloge } from './outils.mjs';
 
-globalThis.window = { location: new URL('https://storit.test/revue/19') };
+// Le stockage de session où Inertia note une redirection (`inertiaLocationVisit`).
+const stockage = new Map();
+globalThis.window = {
+    location: new URL('https://storit.test/revue/19'),
+    sessionStorage: { getItem: (c) => (stockage.has(c) ? stockage.get(c) : null), setItem: (c, v) => stockage.set(c, v), removeItem: (c) => stockage.delete(c) },
+};
 const { brancherInertia, chargeur } = await import('../dist/index.js');
 
 beforeEach(horloge);
@@ -121,4 +126,34 @@ test('débrancher retire les écouteurs', async () => {
     await avancer(300);
     assert.equal(chargeur().etat().affiche, null);
     fin();
+});
+
+test("une redirection vers une autre adresse (409) garde le voile jusqu'au départ", async () => {
+    const r = routeur({ copie: true });
+    const debrancher = brancherInertia(r, { securite: 3000 });
+    const fin = r.visiter({ url: '/login', method: 'post' });
+    await avancer(300);
+    // Inertia note la redirection puis change window.location ; la visite finit.
+    stockage.set('inertiaLocationVisit', '{"preserveScroll":false}');
+    fin();
+    await avancer(1000);
+    assert.deepEqual(chargeur().etat(), { affiche: 'voile', voiles: 1, pastilles: 0, message: 'Redirection…' });
+    // La page n'est pas partie (un téléchargement) : la sécurité retire le voile.
+    await avancer(2500);
+    assert.equal(chargeur().etat().affiche, null);
+    stockage.clear();
+    debrancher();
+});
+
+test("une marque laissée par une redirection plus ancienne ne compte pas", async () => {
+    stockage.set('inertiaLocationVisit', '{"preserveScroll":false}');
+    const r = routeur();
+    const debrancher = brancherInertia(r);
+    const fin = r.visiter({ url: '/a' });
+    await avancer(300);
+    fin();
+    await avancer(1000);
+    assert.equal(chargeur().etat().affiche, null);
+    stockage.clear();
+    debrancher();
 });

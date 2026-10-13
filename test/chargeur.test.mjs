@@ -131,3 +131,16 @@ test('les délais, le thème et les messages se règlent', async () => {
     assert.deepEqual(resume(rendu.journal), ['50 voile Patientez…', '150 masquer']);
     assert.equal(rendu.journal[0].theme, 'sombre');
 });
+
+test('suivre accepte une phrase et un détail, sous le voile', async () => {
+    const rendu = faux();
+    const c = creerChargeur({}, rendu);
+    let resoudre;
+    const promesse = c.suivre(new Promise((r) => (resoudre = r)), { message: 'Synchronisation avec QuickBooks…', detail: 'Ne quittez pas.' }, 'voile');
+    await avancer(300);
+    resoudre();
+    await promesse;
+    await avancer(1000);
+    assert.deepEqual(resume(rendu.journal), ['200 voile Synchronisation avec QuickBooks…', '650 masquer']);
+    assert.equal(rendu.journal[0].detail, 'Ne quittez pas.');
+});

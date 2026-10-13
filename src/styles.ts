@@ -96,12 +96,15 @@ const IMMOBILE = (prefixe: string) =>
     `${prefixe} .sta-roue,${prefixe} .sta-caisse,${prefixe} .sta-ombre,${prefixe} .sta-route{animation:none}${prefixe} .sta-sillage{display:none}`;
 
 // La carte sous le voile et la pastille. Les couleurs passent par des
-// variables, que l'application peut brancher sur ses propres jetons.
+// variables, que l'application peut brancher sur ses propres jetons. Le voile
+// reprend la main (`pointer-events:auto`) : une modale ouverte (Reka UI,
+// Headless UI) met `body` en `pointer-events:none`, dont il hériterait — les
+// clics le traverseraient jusqu'au dialogue.
 const CHARGEUR = `
 .sta-chargeur{--sta-fond:#ffffff;--sta-texte:#14253a;--sta-discret:#5b6b78;--sta-ecran:rgba(13,28,33,.42)}
 .sta-chargeur,.sta-chargeur *{box-sizing:border-box}
 .sta-chargeur .sta-annonce{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-.sta-chargeur .sta-voile{position:fixed;top:0;right:0;bottom:0;left:0;z-index:var(--sta-chargeur-z,99999);display:none;align-items:center;justify-content:center;padding:24px;background-color:var(--sta-chargeur-ecran,var(--sta-ecran))}
+.sta-chargeur .sta-voile{position:fixed;top:0;right:0;bottom:0;left:0;z-index:var(--sta-chargeur-z,99999);display:none;align-items:center;justify-content:center;padding:24px;background-color:var(--sta-chargeur-ecran,var(--sta-ecran));pointer-events:auto}
 .sta-chargeur .sta-carte{display:flex;flex-direction:column;align-items:center;max-width:320px;margin:0;padding:22px 26px;border-radius:20px;background-color:var(--sta-chargeur-fond,var(--sta-fond));color:var(--sta-chargeur-texte,var(--sta-texte));text-align:center;box-shadow:0 24px 60px rgba(13,28,33,.28)}
 .sta-chargeur .sta-message{margin:14px 0 0;padding:0;font-size:16px;font-weight:600;line-height:1.35;color:inherit}
 .sta-chargeur .sta-detail{margin:6px 0 0;padding:0;font-size:13px;font-weight:400;line-height:1.5;color:var(--sta-chargeur-discret,var(--sta-discret))}

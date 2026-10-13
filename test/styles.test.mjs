@@ -40,3 +40,8 @@ test('sans slogan, le cadre s’arrête à la route ; immobile, pas d’animatio
     assert.match(voiture({ largeur: 120, anime: false }), /class="sta-voiture sta-theme-classe sta-immobile"/);
     assert.match(FEUILLE, /\.sta-voiture\.sta-immobile \.sta-roue/);
 });
+
+test('le voile bloque même sous une modale qui coupe les clics de body', () => {
+    assert.match(FEUILLE, /\.sta-chargeur \.sta-voile\{[^}]*pointer-events:auto/);
+    assert.match(FEUILLE, /\.sta-chargeur \.sta-pastille\{[^}]*pointer-events:none/);
+});

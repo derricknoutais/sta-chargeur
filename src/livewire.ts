@@ -1,4 +1,5 @@
 import { chargeur, type Attente, type Mode } from './chargeur.js';
+import { attendreDepart, SECURITE } from './depart.js';
 
 /** Une requête Livewire, résumée : ce qu'elle appelle, ce qu'elle synchronise. */
 export interface EchangeLivewire {
@@ -76,7 +77,7 @@ export function brancherLivewire(livewire: Livewire, options: OptionsLivewire = 
         return () => {};
     }
 
-    const { securite = 15000 } = options;
+    const { securite = SECURITE } = options;
     const fins = new WeakMap<object, () => void>();
     let actif = true;
 
@@ -106,9 +107,8 @@ export function brancherLivewire(livewire: Livewire, options: OptionsLivewire = 
         // délai de sécurité, si l'adresse télécharge un fichier.
         const fin = fins.get(message);
         fins.delete(message);
-        const depart = chargeur().attendre('voile', { message: 'Chargement…' });
+        attendreDepart({ message: 'Chargement…' }, securite);
         if (fin) fin();
-        setTimeout(depart, securite);
     });
 
     livewire.hook('message.processed', (message: MessageLivewire) => terminer(message));

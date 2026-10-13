@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { departParFormulaire, departParLien } from '../dist/index.js';
+import { attenteDeclaree, departParFormulaire, departParLien } from '../dist/index.js';
 
 const ici = new URL('https://shipper.test/commandes?statut=ouvertes');
 
@@ -65,4 +65,28 @@ test('restent sur place : envoi intercepté (Vue, Livewire), autre fenêtre, aut
     assert.equal(departParFormulaire(formulaire({ action: '/a', target: '_blank' }), { defaultPrevented: false }, ici), null);
     assert.equal(departParFormulaire(formulaire({ action: 'https://paiement.example/' }), { defaultPrevented: false }, ici), null);
     assert.equal(departParFormulaire(formulaire({ action: '/a' }, { refuse: true }), { defaultPrevented: false }, ici), null);
+});
+
+/** Un faux élément du DOM : ses attributs, et ses ancêtres pour closest(). */
+function element(attributs = {}, parent = null) {
+    const el = {
+        getAttribute: (n) => (n in attributs ? attributs[n] : null),
+        closest: (sel) => {
+            const nom = sel.slice(1, -1);
+            for (let e = el; e; e = e.parent) if (e.a && nom in e.a) return e;
+            return null;
+        },
+        a: attributs,
+        parent,
+    };
+    return el;
+}
+
+test('les messages posés dans la page : le plus proche l’emporte, bouton d’envoi d’abord', () => {
+    const page = element({ 'data-sta-chargeur-detail': 'Retour vers Storit.' });
+    const formulaire = element({ 'data-sta-chargeur-message': 'Envoi…' }, page);
+    const bouton = element({ 'data-sta-chargeur-message': 'Autorisation en cours…' }, formulaire);
+    assert.deepEqual(attenteDeclaree(bouton, formulaire), { message: 'Autorisation en cours…', detail: 'Retour vers Storit.' });
+    assert.deepEqual(attenteDeclaree(null, formulaire), { message: 'Envoi…', detail: 'Retour vers Storit.' });
+    assert.deepEqual(attenteDeclaree(element()), { message: undefined, detail: undefined });
 });

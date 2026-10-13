@@ -1,4 +1,5 @@
 import { chargeur } from './chargeur.js';
+import { attendreDepart, SECURITE } from './depart.js';
 // Des méthodes de Livewire qui rafraîchissent sans rien changer en base.
 const LEGERES = ['$refresh', '$set', '$toggle', '$sync', 'gotoPage', 'nextPage', 'previousPage', 'setPage', 'resetPage'];
 function resumer(message, composant) {
@@ -34,7 +35,7 @@ export function brancherLivewire(livewire, options = {}) {
         console.warn('[sta-chargeur] Livewire 3 détecté : brancherLivewire ne gère que Livewire 2.');
         return () => { };
     }
-    const { securite = 15000 } = options;
+    const { securite = SECURITE } = options;
     const fins = new WeakMap();
     let actif = true;
     const terminer = (message) => {
@@ -64,10 +65,9 @@ export function brancherLivewire(livewire, options = {}) {
         // délai de sécurité, si l'adresse télécharge un fichier.
         const fin = fins.get(message);
         fins.delete(message);
-        const depart = chargeur().attendre('voile', { message: 'Chargement…' });
+        attendreDepart({ message: 'Chargement…' }, securite);
         if (fin)
             fin();
-        setTimeout(depart, securite);
     });
     livewire.hook('message.processed', (message) => terminer(message));
     // Les envois de fichiers (`wire:model` sur un champ fichier) : des

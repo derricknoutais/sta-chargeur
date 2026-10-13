@@ -59,6 +59,13 @@ reconnue par GitHub). Une application qui versionne son `public/build` (PullDB,
 Fidbak) n'en a pas besoin au déploiement ; celle qui construit sur le serveur
 (Storit) si.
 
+**pnpm** réécrit la dépendance en `git+https://…/sta-chargeur.git` **sans** le
+`#vX.Y.Z` : remettre `github:derricknoutais/sta-chargeur#vX.Y.Z` à la main dans
+`package.json`. **yarn** : `yarn add github:derricknoutais/sta-chargeur#vX.Y.Z`.
+
+L'intégration continue (GitHub Actions qui fait `npm i`) a besoin, elle aussi,
+d'un accès en lecture au dépôt privé — clé de déploiement ou jeton.
+
 Un projet qui garde aussi un `yarn.lock` : `npm install` le réécrit au passage
 (même avec `--no-save`) — vérifier qu'il reste cohérent avec ce que le
 déploiement utilise, ou installer avec l'outil du projet.
@@ -110,6 +117,16 @@ brancherInertia(router, {
 `visite` : `{ methode, chemin, url, brute }` — `brute` est la visite propre à
 la version d'Inertia.
 
+Quand le serveur renvoie vers une autre adresse (`Inertia::location()`,
+réponse 409 — le chemin du SSO), la visite se termine mais la page part : le
+voile reste, « Redirection… », jusqu'au départ (`redirection: { message, detail }`
+pour une autre phrase ; au plus `securite`, 15 s par défaut).
+
+**Inertia 3** rend `router.reload()` muet (il le force en `async`) : pour un
+rechargement que l'utilisateur a demandé (bouton « Actualiser »), passer
+`showProgress: true`. Ses requêtes `useHttp` ne sont pas des visites : les
+entourer de `suivre()`.
+
 ### Vue 2 + Blade (Laravel Mix) — ou Vue 3 + Vite sans Inertia
 
 Valable pour toute application à pages Blade qui parle par axios, quels que
@@ -145,6 +162,10 @@ Ou pour toute l'application : `brancherAxios(axios, { classer, decrire })`,
 même principe qu'Inertia (`classer(requete, parDefaut)` rend `'voile'`,
 `'pastille'` ou `null`).
 
+Les requêtes annulées (`CancelToken`, `AbortController`) ferment leur attente.
+Seule exception connue : axios **0.19.0** exactement perd les clés de
+configuration inconnues, dont `staChargeur` (corrigé en 0.19.1).
+
 `brancherNavigation()` montre le voile quand on **quitte la page** par un lien
 ou un formulaire classique, le temps que la suivante arrive. Il ignore d'office
 ce que l'application a déjà intercepté (`preventDefault` : `@click.prevent`,
@@ -152,6 +173,16 @@ ce que l'application a déjà intercepté (`preventDefault` : `@click.prevent`,
 onglets (`target="_blank"`, Ctrl/Cmd-clic), les ancres, les autres sites, les
 fichiers (`.pdf`, `.xlsx`, `.csv`…) et les liens `download`. Les méthodes
 simulées par Laravel (`@method('DELETE')`) sont reconnues.
+
+Une vue Blade donne sa phrase sans une ligne de JavaScript, sur le bouton
+d'envoi, le lien, le formulaire ou un ancêtre — le plus proche l'emporte, et
+l'emporte sur `decrire` :
+
+```blade
+<form method="POST" action="{{ route('passport.authorizations.approve') }}"
+      data-sta-chargeur-message="Autorisation en cours…"
+      data-sta-chargeur-detail="Retour vers {{ $client->name }}.">
+```
 
 ### Livewire 2
 
@@ -188,6 +219,7 @@ import { suivre, chargeur } from '@derricknoutais/sta-chargeur';
 
 const r = await suivre(fetch(`/recherche?q=${q}`), 'Recherche…'); // pastille
 await suivre(televerser(fichier), 'Envoi de la photo…', 'voile'); // voile
+await suivre(synchroniser(), { message: 'Synchronisation avec QuickBooks…', detail: 'Ne quittez pas cette page.' }, 'voile');
 
 // Une attente qui n'est pas une promesse :
 const fin = chargeur().attendre('voile', { message: 'Impression…', detail: 'Le ticket sort.' });
@@ -225,11 +257,16 @@ chargeur({
 ```
 
 Les couleurs de la carte et de la pastille se branchent sur celles de
-l'application par des variables CSS (le logo, lui, garde les siennes) :
+l'application par des variables CSS (le logo, lui, garde les siennes). Selon
+le kit, les jetons sont des triplets (`--card: 0 0% 100%`, Tailwind 3 → écrire
+`hsl(var(--card))`) ou des couleurs entières (Tailwind 4, shadcn récent →
+`var(--card)`) : une couleur invalide rend la carte transparente. Et choisir un
+fond qui se détache de la page — dans certains thèmes sombres, `--card` vaut
+le fond de page et la pastille disparaît (`--secondary` ou `--popover` alors) :
 
 ```css
 :root {
-    --sta-chargeur-fond: hsl(var(--card));
+    --sta-chargeur-fond: hsl(var(--card)); /* ou var(--card) */
     --sta-chargeur-texte: hsl(var(--foreground));
     --sta-chargeur-discret: hsl(var(--muted-foreground));
     --sta-chargeur-ecran: rgba(13, 28, 33, 0.42); /* derrière la carte */
@@ -266,7 +303,7 @@ attendre, et vérifier que chaque attente se voit, une seule fois.
    Garder les petits indicateurs **locaux** (bouton désactivé avec une
    icône qui tourne, `wire:loading` sur un bouton) : ils disent quel bouton
    travaille, le chargeur dit que l'application travaille.
-3. **Les appels `fetch`** → `suivre(…)`. Les appels axios sont couverts par
+3. **Les appels `fetch`** (et `useHttp` d'Inertia 3) → `suivre(…)`. Les appels axios sont couverts par
    `brancherAxios` ; vérifier qu'aucune instance axios **séparée**
    (`axios.create(…)`) n'y échappe — la brancher aussi.
 4. **Le polling et les rafraîchissements de fond** (`setInterval`,
@@ -279,7 +316,10 @@ attendre, et vérifier que chaque attente se voit, une seule fois.
    un message qui dit ce qui se passe (`decrire`, `staChargeur.message`), et
    `detail` quand il ne faut pas quitter la page.
 7. **Les modales et le plan** : le voile doit passer au-dessus de tout
-   (`--sta-chargeur-z` si une modale monte plus haut que 99999).
+   (`--sta-chargeur-z` si une modale monte plus haut que 99999). Il bloque
+   même sous une modale Reka UI / Headless UI qui coupe les clics de `body`.
+   Les rechargements qu'Inertia 3 rend muets : `showProgress: true` s'ils
+   répondent à un geste de l'utilisateur.
 8. **Le thème** : `.dark` sur `<html>` → rien à faire ; thème selon l'appareil
    (`@media (prefers-color-scheme)`) → `chargeur({ theme: 'systeme' })` ;
    pas de thème sombre → `chargeur({ theme: 'clair' })`.
@@ -299,6 +339,17 @@ Puis <http://localhost:8766/demo/> : boutons à essayer, et des adresses qui
 rejouent des scénarios minutés (`?s=lent`, `?s=court`, `?s=rapide`,
 `?s=interrompu`, `?s=transition`), figent l'affichage (`?fixe=voile`,
 `?fixe=pastille`) ou passent en sombre (`&sombre`, `&theme=systeme`).
+
+## Versions
+
+- **v0.1.1** — redirection Inertia vers une autre adresse (409) : le voile
+  reste jusqu'au départ (« Redirection… ») ; requêtes axios annulées
+  (`CancelToken`, `AbortController`) ; le voile bloque sous une modale qui
+  coupe les clics de `body` ; `suivre(promesse, { message, detail })` ;
+  messages dans la page (`data-sta-chargeur-message`, `-detail`) ;
+  `attendreDepart()` exporté. Relevés par les intégrations dans stapog,
+  Shipper et qbo-pass.
+- **v0.1.0** — première version, extraite de Storit.
 
 ## Faire évoluer le paquet
 

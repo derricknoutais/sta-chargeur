@@ -11,5 +11,6 @@ export { voiture } from './voiture.js';
 export { FEUILLE, injecterStyles } from './styles.js';
 export { brancherInertia } from './inertia.js';
 export { brancherAxios } from './axios.js';
-export { brancherNavigation, departParFormulaire, departParLien, REFUS } from './navigation.js';
+export { attenteDeclaree, brancherNavigation, departParFormulaire, departParLien, REFUS } from './navigation.js';
+export { attendreDepart } from './depart.js';
 export { brancherLivewire } from './livewire.js';

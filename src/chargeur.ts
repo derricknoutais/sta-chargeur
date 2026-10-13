@@ -41,8 +41,11 @@ export interface Chargeur {
      * plusieurs fois sans effet). Rien ne s'affiche avant `delai`.
      */
     attendre(mode: Mode, attente?: Attente): () => void;
-    /** Montre le chargeur le temps que `promesse` se règle, sans rien changer à son résultat. */
-    suivre<T>(promesse: Promise<T>, message?: string, mode?: Mode): Promise<T>;
+    /**
+     * Montre le chargeur le temps que `promesse` se règle, sans rien changer à
+     * son résultat. `attente` : la phrase, ou `{ message, detail }`.
+     */
+    suivre<T>(promesse: Promise<T>, attente?: string | Attente, mode?: Mode): Promise<T>;
     /** Change les options en cours de route (thème, messages, délais). */
     configurer(options: Options): void;
     /** Pour les tests et le débogage. */
@@ -185,8 +188,8 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
         };
     }
 
-    async function suivre<T>(promesse: Promise<T>, message?: string, mode: Mode = 'pastille'): Promise<T> {
-        const fin = attendre(mode, { message });
+    async function suivre<T>(promesse: Promise<T>, attente?: string | Attente, mode: Mode = 'pastille'): Promise<T> {
+        const fin = attendre(mode, typeof attente === 'string' ? { message: attente } : attente || {});
         try {
             return await promesse;
         } finally {
@@ -322,7 +325,8 @@ export function chargeur(options?: Options): Chargeur {
  * appel qu'aucun branchement ne voit passer. Rend la promesse telle quelle.
  *
  *     const r = await suivre(fetch(`/recherche?q=${q}`), 'Recherche…');
+ *     await suivre(rafraichir(), { message: 'Synchronisation…', detail: 'Ne quittez pas.' }, 'voile');
  */
-export function suivre<T>(promesse: Promise<T>, message?: string, mode: Mode = 'pastille'): Promise<T> {
-    return chargeur().suivre(promesse, message, mode);
+export function suivre<T>(promesse: Promise<T>, attente?: string | Attente, mode: Mode = 'pastille'): Promise<T> {
+    return chargeur().suivre(promesse, attente, mode);
 }

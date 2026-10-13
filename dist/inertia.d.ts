@@ -27,6 +27,14 @@ export interface OptionsInertia {
     classer?: (visite: Visite, parDefaut: Mode | null) => Mode | null;
     /** Le message d'une visite ; `null` ou rien → celui par défaut. */
     decrire?: (visite: Visite, mode: Mode) => Attente | null | undefined;
+    /**
+     * Ce qu'on dit quand le serveur renvoie vers une autre adresse
+     * (`Inertia::location()`, réponse 409) : la visite est finie, mais la page
+     * part — le voile reste jusqu'au départ. Défaut : « Redirection… ».
+     */
+    redirection?: Attente;
+    /** Durée maximale d'une redirection qui ne quitte pas la page (téléchargement). Défaut : 15 000 ms. */
+    securite?: number;
 }
 interface RouteurInertia {
     on(evenement: any, rappel: (evenement: any) => any): any;

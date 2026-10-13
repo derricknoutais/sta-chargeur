@@ -44,10 +44,25 @@ export function brancherAxios(axios, options = {}) {
         if (!mode)
             return config;
         const decrit = (options.decrire && options.decrire(config, mode)) || {};
-        config[FIN] = chargeur().attendre(mode, {
+        const fin = chargeur().attendre(mode, {
             message: reglage.message || decrit.message || MESSAGES[methode] || 'Enregistrement…',
             detail: reglage.detail !== undefined ? reglage.detail : decrit.detail,
         });
+        config[FIN] = fin;
+        // Une requête annulée rejette, avec axios 0.x, un `Cancel` qui n'a pas
+        // de `.config` : l'intercepteur de réponse ne saurait pas quoi fermer.
+        // On écoute donc l'annulation elle-même — jeton (`CancelToken`) ou
+        // signal (`AbortController`).
+        const jeton = config.cancelToken;
+        if (jeton && jeton.promise && typeof jeton.promise.then === 'function')
+            jeton.promise.then(fin, fin);
+        const signal = config.signal;
+        if (signal && typeof signal.addEventListener === 'function') {
+            if (signal.aborted)
+                Promise.resolve().then(fin);
+            else
+                signal.addEventListener('abort', fin);
+        }
         return config;
     });
     const terminer = (config) => {

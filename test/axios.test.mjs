@@ -36,6 +36,10 @@ function fauxAxios() {
                     const erreur = { message: 'Network Error', config: c };
                     for (const i of pile.response) if (i) i.echec(erreur).catch(() => {});
                 },
+                // axios 0.x : une annulation rejette un `Cancel` sans `.config`.
+                annuler() {
+                    for (const i of pile.response) if (i) i.echec({ message: 'annulée' }).catch(() => {});
+                },
             };
         },
     };
@@ -110,5 +114,35 @@ test('classer et decrire, pour toute l’application', async () => {
     ping.reussir();
     qbo.reussir();
     await avancer(1000);
+    debrancher();
+});
+
+test("une requête annulée (axios 0.x : Cancel sans config) ne laisse pas le voile coincé", async () => {
+    const axios = fauxAxios();
+    const debrancher = brancherAxios(axios);
+    let annuler;
+    const jeton = { promise: new Promise((r) => (annuler = r)) };
+    const requete = axios.envoyer({ method: 'post', url: '/api/x', headers: {}, cancelToken: jeton });
+    await avancer(300);
+    assert.equal(chargeur().etat().voiles, 1);
+    annuler({ message: 'annulée' });
+    requete.annuler();
+    await avancer(1000);
+    assert.deepEqual(chargeur().etat(), { affiche: null, voiles: 0, pastilles: 0, message: null });
+    debrancher();
+});
+
+test('un signal AbortController, déjà levé ou levé en vol, ferme l’attente', async () => {
+    const axios = fauxAxios();
+    const debrancher = brancherAxios(axios);
+    const ecouteurs = [];
+    const signal = { aborted: false, addEventListener: (t, f) => ecouteurs.push(f) };
+    axios.envoyer({ method: 'get', url: '/a', headers: {}, signal });
+    axios.envoyer({ method: 'get', url: '/b', headers: {}, signal: { aborted: true, addEventListener() {} } });
+    await avancer(300);
+    assert.equal(chargeur().etat().pastilles, 1);
+    ecouteurs.forEach((f) => f());
+    await avancer(1000);
+    assert.equal(chargeur().etat().pastilles, 0);
     debrancher();
 });

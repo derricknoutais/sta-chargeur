@@ -1,4 +1,4 @@
-import { chargeur } from './chargeur.js';
+import { attendreDepart, SECURITE } from './depart.js';
 /** Ce qui écarte un lien ou un formulaire : `data-sta-chargeur="non"` sur lui ou un ancêtre. */
 export const REFUS = '[data-sta-chargeur="non"]';
 // Un fichier qu'on télécharge ne quitte pas la page.
@@ -71,6 +71,24 @@ function messageParDefaut(navigation) {
     return 'Enregistrement…';
 }
 /**
+ * Ce que la page dit d'un départ, sans une ligne de JavaScript :
+ * `data-sta-chargeur-message` et `data-sta-chargeur-detail`, sur le bouton
+ * d'envoi, le lien, le formulaire ou un ancêtre — le plus proche l'emporte.
+ *
+ *     <form method="POST" action="/oauth/authorize" data-sta-chargeur-message="Autorisation en cours…">
+ */
+export function attenteDeclaree(...elements) {
+    const lire = (attribut) => {
+        for (const element of elements) {
+            const porteur = element && typeof element.closest === 'function' ? element.closest(`[${attribut}]`) : null;
+            if (porteur)
+                return porteur.getAttribute(attribut) || undefined;
+        }
+        return undefined;
+    };
+    return { message: lire('data-sta-chargeur-message'), detail: lire('data-sta-chargeur-detail') };
+}
+/**
  * Pour les pages classiques (Blade) : montre le voile quand on quitte la page
  * par un lien ou un formulaire, le temps que la suivante arrive.
  *
@@ -78,33 +96,39 @@ function messageParDefaut(navigation) {
  * (`preventDefault` — Vue, Livewire, Inertia), les nouveaux onglets, les ancres,
  * les autres sites, les fichiers et les liens `download`. Pour écarter le
  * reste — un export qui télécharge sans le dire — `data-sta-chargeur="non"`
- * sur le lien, le formulaire ou un ancêtre.
+ * sur le lien, le formulaire ou un ancêtre. Le message se donne dans la page
+ * (`data-sta-chargeur-message`, `data-sta-chargeur-detail`) ou par `decrire`.
  *
  * Rend la fonction qui débranche.
  */
 export function brancherNavigation(options = {}) {
     if (typeof document === 'undefined')
         return () => { };
-    const { liens = true, formulaires = true, securite = 15000 } = options;
-    const enCours = [];
-    function partir(navigation) {
+    const { liens = true, formulaires = true, securite = SECURITE } = options;
+    // Les départs lancés par ce branchement, à retirer s'il est débranché.
+    const mesDeparts = [];
+    // Le dernier bouton cliqué : le bouton d'envoi d'un formulaire, que Chrome
+    // ne donne (`submitter`) qu'à partir de la version 81.
+    let dernierBouton = null;
+    function partir(navigation, soumetteur) {
+        const declare = attenteDeclaree(soumetteur, navigation.element);
         const decrit = (options.decrire && options.decrire(navigation)) || {};
-        const terminer = chargeur().attendre('voile', { message: decrit.message || messageParDefaut(navigation), detail: decrit.detail });
-        const fin = () => {
-            const i = enCours.indexOf(fin);
-            if (i >= 0)
-                enCours.splice(i, 1);
-            terminer();
-        };
-        enCours.push(fin);
-        setTimeout(fin, securite);
+        mesDeparts.push(attendreDepart({
+            message: declare.message || decrit.message || messageParDefaut(navigation),
+            detail: declare.detail !== undefined ? declare.detail : decrit.detail,
+        }, securite));
     }
     // On regarde une fois l'événement entièrement distribué : un gestionnaire
     // posé après le nôtre (jQuery délégué sur `document`, par exemple) peut
     // encore l'annuler.
     const surClic = (evenement) => {
         const cible = evenement.target;
-        const lien = cible && typeof cible.closest === 'function' ? cible.closest('a[href]') : null;
+        if (!cible || typeof cible.closest !== 'function')
+            return;
+        const bouton = cible.closest('button, input[type="submit"], input[type="image"]');
+        if (bouton)
+            dernierBouton = bouton;
+        const lien = liens ? cible.closest('a[href]') : null;
         if (!lien)
             return;
         setTimeout(() => {
@@ -117,27 +141,21 @@ export function brancherNavigation(options = {}) {
         const formulaire = evenement.target;
         if (!formulaire || formulaire.tagName !== 'FORM')
             return;
+        const soumis = evenement.submitter;
+        const soumetteur = soumis || (dernierBouton && formulaire.contains(dernierBouton) ? dernierBouton : null);
         setTimeout(() => {
             const depart = departParFormulaire(formulaire, evenement, window.location);
             if (depart)
-                partir({ type: 'formulaire', methode: depart.methode, url: depart.url, element: formulaire });
+                partir({ type: 'formulaire', methode: depart.methode, url: depart.url, element: formulaire }, soumetteur);
         }, 0);
     };
-    // Retour arrière : le navigateur ressort la page de son cache, voile compris.
-    const surRetour = (evenement) => {
-        if (!evenement.persisted)
-            return;
-        enCours.slice().forEach((fin) => fin());
-    };
-    if (liens)
+    if (liens || formulaires)
         document.addEventListener('click', surClic);
     if (formulaires)
         document.addEventListener('submit', surEnvoi);
-    window.addEventListener('pageshow', surRetour);
     return () => {
         document.removeEventListener('click', surClic);
         document.removeEventListener('submit', surEnvoi);
-        window.removeEventListener('pageshow', surRetour);
-        enCours.slice().forEach((fin) => fin());
+        mesDeparts.splice(0).forEach((fin) => fin());
     };
 }
