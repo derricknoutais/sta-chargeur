@@ -15,7 +15,7 @@ export { brancherInertia } from './inertia.js';
 export type { OptionsInertia, Visite, VisiteInertia } from './inertia.js';
 export { brancherAxios } from './axios.js';
 export type { InstanceAxios, OptionsAxios, ReglageRequete, RequeteAxios } from './axios.js';
-export { attenteDeclaree, brancherNavigation, departParFormulaire, departParLien, REFUS } from './navigation.js';
+export { attenteDeclaree, brancherNavigation, departParCode, departParFormulaire, departParLien, REFUS } from './navigation.js';
 export { attendreDepart } from './depart.js';
 export type { Navigation, OptionsNavigation } from './navigation.js';
 export { brancherLivewire } from './livewire.js';

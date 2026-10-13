@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attenteDeclaree, departParFormulaire, departParLien } from '../dist/index.js';
+import { attenteDeclaree, departParCode, departParFormulaire, departParLien } from '../dist/index.js';
 
 const ici = new URL('https://shipper.test/commandes?statut=ouvertes');
 
@@ -89,4 +89,23 @@ test('les messages posés dans la page : le plus proche l’emporte, bouton d’
     assert.deepEqual(attenteDeclaree(bouton, formulaire), { message: 'Autorisation en cours…', detail: 'Retour vers Storit.' });
     assert.deepEqual(attenteDeclaree(null, formulaire), { message: 'Envoi…', detail: 'Retour vers Storit.' });
     assert.deepEqual(attenteDeclaree(element()), { message: undefined, detail: undefined });
+});
+
+/** Un faux événement `navigate` de l'API Navigation. */
+const navigate = (champs = {}) => ({ userInitiated: false, hashChange: false, navigationType: 'push', downloadRequest: null, formData: null, destination: { url: 'https://shipper.test/commandes/12', sameDocument: false }, ...champs });
+
+test('un départ lancé par le code (location.href, reload, form.submit) part', () => {
+    assert.deepEqual(departParCode(navigate(), ici).methode, 'get');
+    assert.equal(departParCode(navigate({ navigationType: 'reload', destination: { url: ici.href, sameDocument: false } }), ici).rechargement, true);
+    assert.equal(departParCode(navigate({ formData: {} }), ici).methode, 'post');
+});
+
+test("restent au code de l'application ou sur place : clic de l'utilisateur, ancre, même document, téléchargement, autre site, fichier, traverse", () => {
+    assert.equal(departParCode(navigate({ userInitiated: true }), ici), null);
+    assert.equal(departParCode(navigate({ hashChange: true }), ici), null);
+    assert.equal(departParCode(navigate({ destination: { url: 'https://shipper.test/x', sameDocument: true } }), ici), null);
+    assert.equal(departParCode(navigate({ downloadRequest: 'export.xlsx' }), ici), null);
+    assert.equal(departParCode(navigate({ destination: { url: 'https://stapog.test/oauth', sameDocument: false } }), ici), null);
+    assert.equal(departParCode(navigate({ destination: { url: 'https://shipper.test/exports/bons.xlsx', sameDocument: false } }), ici), null);
+    assert.equal(departParCode(navigate({ navigationType: 'traverse' }), ici), null);
 });

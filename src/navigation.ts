@@ -3,10 +3,12 @@ import { attendreDepart, SECURITE } from './depart.js';
 
 /** Un départ de page vu par `decrire`. */
 export interface Navigation {
-    type: 'lien' | 'formulaire';
+    /** `code` : `location.href = …`, `location.reload()`, `form.submit()`. */
+    type: 'lien' | 'formulaire' | 'code';
     /** `get`, `post` — ou la méthode simulée par Laravel (`_method`) : `put`, `patch`, `delete`. */
     methode: string;
     url: URL;
+    /** Le lien ou le formulaire ; pour un départ du code, `<html>`. */
     element: Element;
 }
 
@@ -15,6 +17,13 @@ export interface OptionsNavigation {
     liens?: boolean;
     /** Suivre l'envoi des formulaires. Défaut : oui. */
     formulaires?: boolean;
+    /**
+     * Suivre les départs lancés par le code (`location.href = …`,
+     * `location.reload()`, `form.submit()`), que seule l'API Navigation voit
+     * (Chrome 102+). Ailleurs — terminaux Sunmi, anciens navigateurs — rien :
+     * poser `attendreDepart()` avant de partir. Défaut : oui.
+     */
+    code?: boolean;
     /**
      * Le message d'un départ ; `null` ou rien → celui par défaut. Un message
      * posé dans la page (`data-sta-chargeur-message`) l'emporte.
@@ -114,6 +123,38 @@ export function departParFormulaire(formulaire: Formulaire, envoi: { defaultPrev
     return { url, methode };
 }
 
+// Ce qu'on lit d'un événement `navigate` de l'API Navigation.
+interface EvenementNavigate {
+    userInitiated?: boolean;
+    hashChange?: boolean;
+    navigationType?: string;
+    downloadRequest?: string | null;
+    formData?: unknown;
+    destination?: { url: string; sameDocument?: boolean };
+    defaultPrevented?: boolean;
+    signal?: { addEventListener?: (type: string, rappel: () => void) => void };
+}
+
+/**
+ * Où part la page quand le code la fait partir, ou `null` si ce départ ne la
+ * quitte pas ou n'est pas le nôtre. Les clics et les envois de l'utilisateur
+ * (`userInitiated`) sont laissés aux écouteurs de liens et de formulaires.
+ * D'après l'intégration dans Shipper.
+ */
+export function departParCode(evenement: EvenementNavigate, ici: Ici): { url: URL; methode: string; rechargement: boolean } | null {
+    if (evenement.userInitiated || evenement.hashChange) return null;
+    if (!evenement.destination || evenement.destination.sameDocument) return null;
+    if (evenement.downloadRequest !== null && evenement.downloadRequest !== undefined) return null;
+    const type = evenement.navigationType || '';
+    if (type !== 'push' && type !== 'replace' && type !== 'reload') return null;
+
+    const url = adresse(evenement.destination.url, ici);
+    if (!url) return null;
+
+    // `formData` n'existe que pour un POST ; un GET se lit dans l'adresse.
+    return { url, methode: evenement.formData ? 'post' : 'get', rechargement: type === 'reload' };
+}
+
 function messageParDefaut(navigation: Navigation): string {
     if (navigation.methode === 'get') return 'Chargement…';
     if (navigation.methode === 'delete') return 'Suppression…';
@@ -155,25 +196,25 @@ export function attenteDeclaree(...elements: Array<Pick<Element, 'closest'> | nu
 export function brancherNavigation(options: OptionsNavigation = {}): () => void {
     if (typeof document === 'undefined') return () => {};
 
-    const { liens = true, formulaires = true, securite = SECURITE } = options;
+    const { liens = true, formulaires = true, code = true, securite = SECURITE } = options;
     // Les départs lancés par ce branchement, à retirer s'il est débranché.
     const mesDeparts: Array<() => void> = [];
     // Le dernier bouton cliqué : le bouton d'envoi d'un formulaire, que Chrome
     // ne donne (`submitter`) qu'à partir de la version 81.
     let dernierBouton: Element | null = null;
 
-    function partir(navigation: Navigation, soumetteur?: Element | null) {
+    function partir(navigation: Navigation, soumetteur?: Element | null, parDefaut?: string): () => void {
         const declare = attenteDeclaree(soumetteur, navigation.element);
         const decrit: Attente = (options.decrire && options.decrire(navigation)) || {};
-        mesDeparts.push(
-            attendreDepart(
-                {
-                    message: declare.message || decrit.message || messageParDefaut(navigation),
-                    detail: declare.detail !== undefined ? declare.detail : decrit.detail,
-                },
-                securite,
-            ),
+        const fin = attendreDepart(
+            {
+                message: declare.message || decrit.message || parDefaut || messageParDefaut(navigation),
+                detail: declare.detail !== undefined ? declare.detail : decrit.detail,
+            },
+            securite,
         );
+        mesDeparts.push(fin);
+        return fin;
     }
 
     // On regarde une fois l'événement entièrement distribué : un gestionnaire
@@ -203,12 +244,32 @@ export function brancherNavigation(options: OptionsNavigation = {}): () => void 
         }, 0);
     };
 
+    // Les départs du code : l'API Navigation, quand elle existe.
+    const api = (window as unknown as { navigation?: { addEventListener(t: string, f: (e: EvenementNavigate) => void): void; removeEventListener(t: string, f: (e: EvenementNavigate) => void): void } }).navigation;
+    const surNavigation = (evenement: EvenementNavigate) => {
+        const depart = departParCode(evenement, window.location);
+        if (!depart) return;
+        setTimeout(() => {
+            // Un autre écouteur a pu l'annuler.
+            if (evenement.defaultPrevented) return;
+            const fin = partir(
+                { type: 'code', methode: depart.methode, url: depart.url, element: document.documentElement },
+                null,
+                depart.rechargement ? 'Rechargement de la page…' : undefined,
+            );
+            // Une navigation interrompue (une autre la remplace, Échap) : on retire.
+            if (evenement.signal && typeof evenement.signal.addEventListener === 'function') evenement.signal.addEventListener('abort', fin);
+        }, 0);
+    };
+
     if (liens || formulaires) document.addEventListener('click', surClic);
     if (formulaires) document.addEventListener('submit', surEnvoi);
+    if (code && api && typeof api.addEventListener === 'function') api.addEventListener('navigate', surNavigation);
 
     return () => {
         document.removeEventListener('click', surClic);
         document.removeEventListener('submit', surEnvoi);
+        if (api && typeof api.removeEventListener === 'function') api.removeEventListener('navigate', surNavigation);
         mesDeparts.splice(0).forEach((fin) => fin());
     };
 }

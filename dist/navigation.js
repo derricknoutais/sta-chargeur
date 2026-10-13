@@ -63,6 +63,28 @@ export function departParFormulaire(formulaire, envoi, ici) {
         methode = simule.value.toLowerCase();
     return { url, methode };
 }
+/**
+ * Où part la page quand le code la fait partir, ou `null` si ce départ ne la
+ * quitte pas ou n'est pas le nôtre. Les clics et les envois de l'utilisateur
+ * (`userInitiated`) sont laissés aux écouteurs de liens et de formulaires.
+ * D'après l'intégration dans Shipper.
+ */
+export function departParCode(evenement, ici) {
+    if (evenement.userInitiated || evenement.hashChange)
+        return null;
+    if (!evenement.destination || evenement.destination.sameDocument)
+        return null;
+    if (evenement.downloadRequest !== null && evenement.downloadRequest !== undefined)
+        return null;
+    const type = evenement.navigationType || '';
+    if (type !== 'push' && type !== 'replace' && type !== 'reload')
+        return null;
+    const url = adresse(evenement.destination.url, ici);
+    if (!url)
+        return null;
+    // `formData` n'existe que pour un POST ; un GET se lit dans l'adresse.
+    return { url, methode: evenement.formData ? 'post' : 'get', rechargement: type === 'reload' };
+}
 function messageParDefaut(navigation) {
     if (navigation.methode === 'get')
         return 'Chargement…';
@@ -104,19 +126,21 @@ export function attenteDeclaree(...elements) {
 export function brancherNavigation(options = {}) {
     if (typeof document === 'undefined')
         return () => { };
-    const { liens = true, formulaires = true, securite = SECURITE } = options;
+    const { liens = true, formulaires = true, code = true, securite = SECURITE } = options;
     // Les départs lancés par ce branchement, à retirer s'il est débranché.
     const mesDeparts = [];
     // Le dernier bouton cliqué : le bouton d'envoi d'un formulaire, que Chrome
     // ne donne (`submitter`) qu'à partir de la version 81.
     let dernierBouton = null;
-    function partir(navigation, soumetteur) {
+    function partir(navigation, soumetteur, parDefaut) {
         const declare = attenteDeclaree(soumetteur, navigation.element);
         const decrit = (options.decrire && options.decrire(navigation)) || {};
-        mesDeparts.push(attendreDepart({
-            message: declare.message || decrit.message || messageParDefaut(navigation),
+        const fin = attendreDepart({
+            message: declare.message || decrit.message || parDefaut || messageParDefaut(navigation),
             detail: declare.detail !== undefined ? declare.detail : decrit.detail,
-        }, securite));
+        }, securite);
+        mesDeparts.push(fin);
+        return fin;
     }
     // On regarde une fois l'événement entièrement distribué : un gestionnaire
     // posé après le nôtre (jQuery délégué sur `document`, par exemple) peut
@@ -149,13 +173,33 @@ export function brancherNavigation(options = {}) {
                 partir({ type: 'formulaire', methode: depart.methode, url: depart.url, element: formulaire }, soumetteur);
         }, 0);
     };
+    // Les départs du code : l'API Navigation, quand elle existe.
+    const api = window.navigation;
+    const surNavigation = (evenement) => {
+        const depart = departParCode(evenement, window.location);
+        if (!depart)
+            return;
+        setTimeout(() => {
+            // Un autre écouteur a pu l'annuler.
+            if (evenement.defaultPrevented)
+                return;
+            const fin = partir({ type: 'code', methode: depart.methode, url: depart.url, element: document.documentElement }, null, depart.rechargement ? 'Rechargement de la page…' : undefined);
+            // Une navigation interrompue (une autre la remplace, Échap) : on retire.
+            if (evenement.signal && typeof evenement.signal.addEventListener === 'function')
+                evenement.signal.addEventListener('abort', fin);
+        }, 0);
+    };
     if (liens || formulaires)
         document.addEventListener('click', surClic);
     if (formulaires)
         document.addEventListener('submit', surEnvoi);
+    if (code && api && typeof api.addEventListener === 'function')
+        api.addEventListener('navigate', surNavigation);
     return () => {
         document.removeEventListener('click', surClic);
         document.removeEventListener('submit', surEnvoi);
+        if (api && typeof api.removeEventListener === 'function')
+            api.removeEventListener('navigate', surNavigation);
         mesDeparts.splice(0).forEach((fin) => fin());
     };
 }

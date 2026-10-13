@@ -49,7 +49,7 @@ l'application parle au serveur.
 ## Installation
 
 ```bash
-npm install github:derricknoutais/sta-chargeur#v0.1.0
+npm install github:derricknoutais/sta-chargeur#v0.1.1
 ```
 
 Le dépôt est **privé** : `npm` le récupère par git, avec les identifiants de
@@ -174,7 +174,18 @@ Seule exception connue : axios **0.19.0** exactement perd les clés de
 configuration inconnues, dont `staChargeur` (corrigé en 0.19.1).
 
 `brancherNavigation()` montre le voile quand on **quitte la page** par un lien
-ou un formulaire classique, le temps que la suivante arrive. Il ignore d'office
+ou un formulaire classique, le temps que la suivante arrive — et, dans les
+navigateurs qui ont l'API Navigation (Chrome 102+), quand c'est le **code** qui
+la fait partir : `location.href = …`, `location.reload()` (« Rechargement de la
+page… »), `form.submit()`. Ailleurs (terminaux Sunmi, anciens navigateurs),
+poser soi-même le voile avant de partir :
+
+```js
+import { attendreDepart } from '@derricknoutais/sta-chargeur';
+
+attendreDepart({ message: 'Création du contrat…' });
+window.location.href = `/contrats/${id}`;
+``` Il ignore d'office
 ce que l'application a déjà intercepté (`preventDefault` : `@click.prevent`,
 `@submit.prevent`, `wire:submit.prevent`, les `<Link>` d'Inertia), les nouveaux
 onglets (`target="_blank"`, Ctrl/Cmd-clic), les ancres, les autres sites, les
@@ -358,9 +369,10 @@ rejouent des scénarios minutés (`?s=lent`, `?s=court`, `?s=rapide`,
   coupe les clics de `body`, et reste annoncé aux lecteurs d'écran ; jamais
   imprimé ; phrase par méthode pour Inertia (« Enregistrement… »,
   « Suppression… ») ; `suivre(promesse, { message, detail })` ; messages dans
-  la page (`data-sta-chargeur-message`, `-detail`) ; `attendreDepart()`
-  exporté. Relevés par les intégrations dans stapog, STA Compta, qbo-pass,
-  RentalPro et Shipper.
+  la page (`data-sta-chargeur-message`, `-detail`) ; départs lancés par le
+  code (`location.href`, `reload()`, `form.submit()`) vus par l'API Navigation ;
+  `attendreDepart()` exporté. Relevés par les intégrations dans stapog,
+  STA Compta, qbo-pass, RentalPro et Shipper.
 - **v0.1.0** — première version, extraite de Storit.
 
 ## Faire évoluer le paquet

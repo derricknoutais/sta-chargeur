@@ -1,10 +1,12 @@
 import { type Attente } from './chargeur.js';
 /** Un départ de page vu par `decrire`. */
 export interface Navigation {
-    type: 'lien' | 'formulaire';
+    /** `code` : `location.href = …`, `location.reload()`, `form.submit()`. */
+    type: 'lien' | 'formulaire' | 'code';
     /** `get`, `post` — ou la méthode simulée par Laravel (`_method`) : `put`, `patch`, `delete`. */
     methode: string;
     url: URL;
+    /** Le lien ou le formulaire ; pour un départ du code, `<html>`. */
     element: Element;
 }
 export interface OptionsNavigation {
@@ -12,6 +14,13 @@ export interface OptionsNavigation {
     liens?: boolean;
     /** Suivre l'envoi des formulaires. Défaut : oui. */
     formulaires?: boolean;
+    /**
+     * Suivre les départs lancés par le code (`location.href = …`,
+     * `location.reload()`, `form.submit()`), que seule l'API Navigation voit
+     * (Chrome 102+). Ailleurs — terminaux Sunmi, anciens navigateurs — rien :
+     * poser `attendreDepart()` avant de partir. Défaut : oui.
+     */
+    code?: boolean;
     /**
      * Le message d'un départ ; `null` ou rien → celui par défaut. Un message
      * posé dans la page (`data-sta-chargeur-message`) l'emporte.
@@ -59,6 +68,32 @@ export declare function departParFormulaire(formulaire: Formulaire, envoi: {
 }, ici: Ici): {
     url: URL;
     methode: string;
+} | null;
+interface EvenementNavigate {
+    userInitiated?: boolean;
+    hashChange?: boolean;
+    navigationType?: string;
+    downloadRequest?: string | null;
+    formData?: unknown;
+    destination?: {
+        url: string;
+        sameDocument?: boolean;
+    };
+    defaultPrevented?: boolean;
+    signal?: {
+        addEventListener?: (type: string, rappel: () => void) => void;
+    };
+}
+/**
+ * Où part la page quand le code la fait partir, ou `null` si ce départ ne la
+ * quitte pas ou n'est pas le nôtre. Les clics et les envois de l'utilisateur
+ * (`userInitiated`) sont laissés aux écouteurs de liens et de formulaires.
+ * D'après l'intégration dans Shipper.
+ */
+export declare function departParCode(evenement: EvenementNavigate, ici: Ici): {
+    url: URL;
+    methode: string;
+    rechargement: boolean;
 } | null;
 /**
  * Ce que la page dit d'un départ, sans une ligne de JavaScript :
