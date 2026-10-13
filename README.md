@@ -53,6 +53,10 @@ travers le proxy LadderVPN (`127.0.0.1:9090`).
 Chaque application **monte de version explicitement** (`#v0.1.1`, …) : rien
 ne change chez elle sans qu'elle le décide.
 
+Un projet qui garde aussi un `yarn.lock` : `npm install` le réécrit au passage
+(même avec `--no-save`) — vérifier qu'il reste cohérent avec ce que le
+déploiement utilise, ou installer avec l'outil du projet.
+
 ## Brancher une application
 
 Un seul chargeur par page, partagé par tous les branchements : on peut en
@@ -217,6 +221,10 @@ l'application par des variables CSS (le logo, lui, garde les siennes) :
     --sta-chargeur-z: 99999; /* le plan, au-dessus des modales */
 }
 ```
+
+Une application qui agrandit son conteneur par `zoom` (PullDB : `zoom: 1.25`
+sur sa mise en page) : le chargeur, ajouté à la fin de `<body>`, reste hors de
+ce conteneur — lui donner la même échelle, `.sta-chargeur { zoom: 1.25; }`.
 
 La feuille de style est injectée dans `<head>` au premier affichage. Sous une
 CSP stricte, l'inclure soi-même : elle est exportée (`FEUILLE`).
