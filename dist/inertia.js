@@ -1,5 +1,13 @@
 import { chargeur } from './chargeur.js';
 import { attendreDepart, SECURITE } from './depart.js';
+// Sous le voile, sans phrase de l'application : selon la méthode (GET garde
+// celle du chargeur, « Chargement… »).
+const MESSAGES = {
+    post: 'Enregistrement…',
+    put: 'Enregistrement…',
+    patch: 'Enregistrement…',
+    delete: 'Suppression…',
+};
 // Inertia 1, 2 et 3 notent une redirection vers une autre adresse sous cette
 // clé, juste avant de changer `window.location` ; la page suivante l'efface.
 const CLE_REDIRECTION = 'inertiaLocationVisit';
@@ -48,7 +56,10 @@ export function brancherInertia(router, options = {}) {
         const mode = options.classer ? options.classer(visite, parDefaut) : parDefaut;
         if (!mode)
             return;
-        const attente = (options.decrire && options.decrire(visite, mode)) || {};
+        const decrit = (options.decrire && options.decrire(visite, mode)) || {};
+        // Sans phrase de l'application, celle de la méthode — comme axios et la
+        // navigation : on enregistre, on supprime, on charge.
+        const attente = decrit.message || mode !== 'voile' ? decrit : { message: MESSAGES[visite.methode], detail: decrit.detail };
         const suivie = { fin: chargeur().attendre(mode, attente), marque: marqueRedirection() };
         suivies.set(brute, suivie);
         if (typeof brute.url === 'object')

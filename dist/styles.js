@@ -111,6 +111,9 @@ export const FEUILLE = [
     CHARGEUR,
     enSombre('.sta-chargeur', CHARGEUR_SOMBRE),
     `@media (prefers-reduced-motion: reduce){${IMMOBILE('.sta-voiture')}.sta-chargeur .sta-visible{animation:none}}`,
+    // Une impression lancée pendant une attente (window.print(), PDF) ne doit
+    // pas emporter le voile sur le papier.
+    '@media print{.sta-chargeur{display:none!important}}',
 ]
     .join('\n')
     .replace(/\n+/g, '\n')

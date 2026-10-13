@@ -157,3 +157,23 @@ test("une marque laissée par une redirection plus ancienne ne compte pas", asyn
     stockage.clear();
     debrancher();
 });
+
+test("sans phrase de l'application, celle de la méthode", async () => {
+    const r = routeur();
+    const debrancher = brancherInertia(r);
+    const a = r.visiter({ url: '/clients', method: 'post' });
+    await avancer(300);
+    assert.equal(chargeur().etat().message, 'Enregistrement…');
+    const b = r.visiter({ url: '/clients/3', method: 'delete' });
+    await avancer(10);
+    assert.equal(chargeur().etat().message, 'Suppression…');
+    a();
+    b();
+    await avancer(1000);
+    const c = r.visiter({ url: '/clients' });
+    await avancer(300);
+    assert.equal(chargeur().etat().message, 'Chargement…');
+    c();
+    await avancer(1000);
+    debrancher();
+});

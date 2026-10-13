@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { creerChargeur } from '../dist/index.js';
+import { creerChargeur, toucheBloquee } from '../dist/index.js';
 import { arreterHorloge, avancer, faux, horloge, vider } from './outils.mjs';
 
 beforeEach(horloge);
@@ -18,14 +18,14 @@ test('une attente brève ne montre rien', async () => {
     assert.deepEqual(rendu.journal, []);
 });
 
-test('une attente longue : affichée à 200 ms, retirée à la fin', async () => {
+test('une attente longue : affichée à 200 ms, retirée 100 ms après la fin (grâce)', async () => {
     const rendu = faux();
     const c = creerChargeur({}, rendu);
     const fin = c.attendre('voile', { message: 'Écriture dans Lightspeed…', detail: 'Ne quittez pas cette page.' });
     await avancer(1500);
     fin();
-    await avancer(10);
-    assert.deepEqual(resume(rendu.journal), ['200 voile Écriture dans Lightspeed…', '1500 masquer']);
+    await avancer(200);
+    assert.deepEqual(resume(rendu.journal), ['200 voile Écriture dans Lightspeed…', '1600 masquer']);
     assert.equal(rendu.journal[0].detail, 'Ne quittez pas cette page.');
 });
 
@@ -49,8 +49,8 @@ test("une visite qui en remplace une autre ne fait pas clignoter", async () => {
     const b = c.attendre('voile', { message: 'B' });
     await avancer(500);
     b();
-    await avancer(10);
-    assert.deepEqual(resume(rendu.journal), ['200 voile A', '500 voile B', '1000 masquer']);
+    await avancer(200);
+    assert.deepEqual(resume(rendu.journal), ['200 voile A', '500 voile B', '1100 masquer']);
 });
 
 test('un voile qui succède à la pastille la remplace aussitôt', async () => {
@@ -64,7 +64,7 @@ test('un voile qui succède à la pastille la remplace aussitôt', async () => {
     await avancer(100);
     p();
     await avancer(1000);
-    assert.deepEqual(resume(rendu.journal), ['200 pastille Recherche…', '300 voile Lancement…', '700 pastille Recherche…', '800 masquer']);
+    assert.deepEqual(resume(rendu.journal), ['200 pastille Recherche…', '300 voile Lancement…', '700 pastille Recherche…', '900 masquer']);
 });
 
 test("la plus récente des attentes parle ; quand elle finit, la précédente reprend", async () => {
@@ -123,7 +123,7 @@ test('suivre montre la pastille avec son message pendant la promesse', async () 
 
 test('les délais, le thème et les messages se règlent', async () => {
     const rendu = faux();
-    const c = creerChargeur({ delai: 50, minimum: 100, theme: 'sombre', messages: { voile: 'Patientez…' } }, rendu);
+    const c = creerChargeur({ delai: 50, minimum: 100, grace: 0, theme: 'sombre', messages: { voile: 'Patientez…' } }, rendu);
     const fin = c.attendre('voile');
     await avancer(60);
     fin();
@@ -143,4 +143,26 @@ test('suivre accepte une phrase et un détail, sous le voile', async () => {
     await avancer(1000);
     assert.deepEqual(resume(rendu.journal), ['200 voile Synchronisation avec QuickBooks…', '650 masquer']);
     assert.equal(rendu.journal[0].detail, 'Ne quittez pas.');
+});
+
+test("une attente qui en enchaîne une autre (dans le .then de la précédente) ne fait pas retomber le voile", async () => {
+    const rendu = faux();
+    const c = creerChargeur({}, rendu);
+    const facture = c.attendre('voile', { message: 'Création de la facture…' });
+    await avancer(800);
+    facture();
+    // La requête suivante part 40 ms plus tard (réponse traitée, puis envoi).
+    await avancer(40);
+    const numero = c.attendre('voile', { message: 'Mise à jour du numéro…' });
+    await avancer(600);
+    numero();
+    await avancer(300);
+    assert.deepEqual(resume(rendu.journal), ['200 voile Création de la facture…', '840 voile Mise à jour du numéro…', '1540 masquer']);
+});
+
+test('sous le voile, le clavier ne passe pas — sauf Tab, F5 et les raccourcis du navigateur', () => {
+    for (const key of ['Enter', ' ', 'Escape', 'a', 'ArrowDown', 'Backspace']) assert.equal(toucheBloquee({ key }), true, key);
+    for (const key of ['Tab', 'F5', 'F12']) assert.equal(toucheBloquee({ key }), false, key);
+    assert.equal(toucheBloquee({ key: 'r', metaKey: true }), false);
+    assert.equal(toucheBloquee({ key: 'r', ctrlKey: true }), false);
 });

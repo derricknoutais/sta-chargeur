@@ -19,6 +19,13 @@ export interface Options {
     delai?: number;
     /** Une fois affiché, il reste au moins ce temps : pas d'éclair à 210 ms. Défaut : 450 ms. */
     minimum?: number;
+    /**
+     * Avant de se retirer, il attend encore ce temps : une attente qui en
+     * enchaîne une autre (une requête lancée dans le `.then` de la
+     * précédente) le trouve encore là, au lieu de le faire retomber puis
+     * revenir 200 ms plus tard. Défaut : 100 ms.
+     */
+    grace?: number;
     /** Défaut : `classe` (sombre sous `.dark`). */
     theme?: Theme;
     /** Les messages quand l'attente n'en donne pas. */
@@ -61,6 +68,19 @@ export interface Chargeur {
  * elles passent par `chargeur()`, que partagent tous les branchements.
  */
 export declare function creerChargeur(options?: Options, rendu?: Rendu): Chargeur;
+/**
+ * Les touches qui ne passent pas sous le voile. Le voile arrête la souris, pas
+ * le clavier : sans lui, Entrée sur le bouton qui garde le focus relance le
+ * geste en attente — trois appuis, trois paiements (vu dans STA Compta). Passent
+ * seulement Tab, les touches de fonction (F5) et les raccourcis du navigateur
+ * (Ctrl, Cmd, Alt).
+ */
+export declare function toucheBloquee(evenement: {
+    key?: string;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
+}): boolean;
 /**
  * Le rendu dans la page : un bloc ajouté à la fin de `<body>`, hors de
  * l'application — Inertia remplace le contenu de `#app` à chaque visite, pas

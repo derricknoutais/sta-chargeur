@@ -25,7 +25,11 @@ export interface OptionsInertia {
      * affichée (filtre, tri, pagination) → `pastille` ; le reste → `voile`.
      */
     classer?: (visite: Visite, parDefaut: Mode | null) => Mode | null;
-    /** Le message d'une visite ; `null` ou rien → celui par défaut. */
+    /**
+     * Le message d'une visite ; `null` ou rien → celui par défaut : sous le
+     * voile, « Enregistrement… » (POST, PUT, PATCH), « Suppression… »
+     * (DELETE), « Chargement… » (GET) ; sur la pastille, « Mise à jour… ».
+     */
     decrire?: (visite: Visite, mode: Mode) => Attente | null | undefined;
     /**
      * Ce qu'on dit quand le serveur renvoie vers une autre adresse

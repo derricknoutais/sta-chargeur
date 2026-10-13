@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { injecterStyles } from './styles.js';
 import { voiture } from './voiture.js';
-const PAR_DEFAUT = { delai: 200, minimum: 450, theme: 'classe', voile: 'Chargement…', pastille: 'Mise à jour…' };
+const PAR_DEFAUT = { delai: 200, minimum: 450, grace: 100, theme: 'classe', voile: 'Chargement…', pastille: 'Mise à jour…' };
 /**
  * Crée un chargeur indépendant. Les applications n'en veulent qu'un par page :
  * elles passent par `chargeur()`, que partagent tous les branchements.
@@ -22,6 +22,8 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
             reglages.delai = o.delai;
         if (o.minimum !== undefined)
             reglages.minimum = o.minimum;
+        if (o.grace !== undefined)
+            reglages.grace = o.grace;
         if (o.theme !== undefined)
             reglages.theme = o.theme;
         if (o.messages && o.messages.voile)
@@ -104,7 +106,7 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
         }
         if (!affiche)
             return;
-        const reste = reglages.minimum - (Date.now() - afficheDepuis);
+        const reste = Math.max(reglages.minimum - (Date.now() - afficheDepuis), reglages.grace);
         if (reste <= 0) {
             affiche = null;
             dessiner();
@@ -169,6 +171,20 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
     };
 }
 /**
+ * Les touches qui ne passent pas sous le voile. Le voile arrête la souris, pas
+ * le clavier : sans lui, Entrée sur le bouton qui garde le focus relance le
+ * geste en attente — trois appuis, trois paiements (vu dans STA Compta). Passent
+ * seulement Tab, les touches de fonction (F5) et les raccourcis du navigateur
+ * (Ctrl, Cmd, Alt).
+ */
+export function toucheBloquee(evenement) {
+    if (evenement.ctrlKey || evenement.metaKey || evenement.altKey)
+        return false;
+    const touche = evenement.key || '';
+    return touche !== 'Tab' && !/^F\d{1,2}$/.test(touche);
+}
+const EVENEMENTS_CLAVIER = ['keydown', 'keypress', 'keyup'];
+/**
  * Le rendu dans la page : un bloc ajouté à la fin de `<body>`, hors de
  * l'application — Inertia remplace le contenu de `#app` à chaque visite, pas
  * celui de `<body>`. Créé à la première attente qui dure.
@@ -212,6 +228,26 @@ export function renduDom() {
         if (!racine.parentNode)
             document.body.appendChild(racine);
     }
+    // Tant que le voile est là, le clavier s'arrête à la fenêtre (phase de
+    // capture) : rien n'atteint la page dessous.
+    let clavierGarde = false;
+    const garde = (evenement) => {
+        if (!toucheBloquee(evenement))
+            return;
+        evenement.preventDefault();
+        evenement.stopPropagation();
+    };
+    function garderClavier(actif) {
+        if (actif === clavierGarde || typeof window === 'undefined')
+            return;
+        clavierGarde = actif;
+        for (const type of EVENEMENTS_CLAVIER) {
+            if (actif)
+                window.addEventListener(type, garde, true);
+            else
+                window.removeEventListener(type, garde, true);
+        }
+    }
     function basculer(el, visible) {
         const deja = el.className.indexOf('sta-visible') >= 0;
         if (visible && !deja)
@@ -222,8 +258,13 @@ export function renduDom() {
     return {
         afficher(mode, attente, theme) {
             monter(theme);
-            if (!elements)
+            if (!elements || !racine)
                 return;
+            // Une modale (Reka UI, Headless UI) cache aux lecteurs d'écran tout
+            // ce qui n'est pas elle, nous compris : l'annonce serait muette.
+            racine.removeAttribute('aria-hidden');
+            racine.removeAttribute('inert');
+            garderClavier(mode === 'voile');
             const { annonce, voile, message, detail, pastille, texte } = elements;
             if (mode === 'voile') {
                 message.textContent = attente.message;
@@ -239,6 +280,7 @@ export function renduDom() {
                 annonce.textContent = attente.message;
         },
         masquer() {
+            garderClavier(false);
             if (!elements)
                 return;
             basculer(elements.voile, false);

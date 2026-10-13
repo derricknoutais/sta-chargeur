@@ -23,6 +23,13 @@ export interface Options {
     delai?: number;
     /** Une fois affiché, il reste au moins ce temps : pas d'éclair à 210 ms. Défaut : 450 ms. */
     minimum?: number;
+    /**
+     * Avant de se retirer, il attend encore ce temps : une attente qui en
+     * enchaîne une autre (une requête lancée dans le `.then` de la
+     * précédente) le trouve encore là, au lieu de le faire retomber puis
+     * revenir 200 ms plus tard. Défaut : 100 ms.
+     */
+    grace?: number;
     /** Défaut : `classe` (sombre sous `.dark`). */
     theme?: Theme;
     /** Les messages quand l'attente n'en donne pas. */
@@ -58,7 +65,7 @@ interface Entree {
     detail: string | null;
 }
 
-const PAR_DEFAUT = { delai: 200, minimum: 450, theme: 'classe' as Theme, voile: 'Chargement…', pastille: 'Mise à jour…' };
+const PAR_DEFAUT = { delai: 200, minimum: 450, grace: 100, theme: 'classe' as Theme, voile: 'Chargement…', pastille: 'Mise à jour…' };
 
 /**
  * Crée un chargeur indépendant. Les applications n'en veulent qu'un par page :
@@ -71,6 +78,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
     function appliquer(o: Options) {
         if (o.delai !== undefined) reglages.delai = o.delai;
         if (o.minimum !== undefined) reglages.minimum = o.minimum;
+        if (o.grace !== undefined) reglages.grace = o.grace;
         if (o.theme !== undefined) reglages.theme = o.theme;
         if (o.messages && o.messages.voile) reglages.voile = o.messages.voile;
         if (o.messages && o.messages.pastille) reglages.pastille = o.messages.pastille;
@@ -153,7 +161,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
         }
         if (!affiche) return;
 
-        const reste = reglages.minimum - (Date.now() - afficheDepuis);
+        const reste = Math.max(reglages.minimum - (Date.now() - afficheDepuis), reglages.grace);
         if (reste <= 0) {
             affiche = null;
             dessiner();
@@ -216,6 +224,21 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
 }
 
 /**
+ * Les touches qui ne passent pas sous le voile. Le voile arrête la souris, pas
+ * le clavier : sans lui, Entrée sur le bouton qui garde le focus relance le
+ * geste en attente — trois appuis, trois paiements (vu dans STA Compta). Passent
+ * seulement Tab, les touches de fonction (F5) et les raccourcis du navigateur
+ * (Ctrl, Cmd, Alt).
+ */
+export function toucheBloquee(evenement: { key?: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean }): boolean {
+    if (evenement.ctrlKey || evenement.metaKey || evenement.altKey) return false;
+    const touche = evenement.key || '';
+    return touche !== 'Tab' && !/^F\d{1,2}$/.test(touche);
+}
+
+const EVENEMENTS_CLAVIER = ['keydown', 'keypress', 'keyup'];
+
+/**
  * Le rendu dans la page : un bloc ajouté à la fin de `<body>`, hors de
  * l'application — Inertia remplace le contenu de `#app` à chaque visite, pas
  * celui de `<body>`. Créé à la première attente qui dure.
@@ -266,6 +289,23 @@ export function renduDom(): Rendu {
         if (!racine.parentNode) document.body.appendChild(racine);
     }
 
+    // Tant que le voile est là, le clavier s'arrête à la fenêtre (phase de
+    // capture) : rien n'atteint la page dessous.
+    let clavierGarde = false;
+    const garde = (evenement: KeyboardEvent) => {
+        if (!toucheBloquee(evenement)) return;
+        evenement.preventDefault();
+        evenement.stopPropagation();
+    };
+    function garderClavier(actif: boolean) {
+        if (actif === clavierGarde || typeof window === 'undefined') return;
+        clavierGarde = actif;
+        for (const type of EVENEMENTS_CLAVIER) {
+            if (actif) window.addEventListener(type, garde as EventListener, true);
+            else window.removeEventListener(type, garde as EventListener, true);
+        }
+    }
+
     function basculer(el: HTMLElement, visible: boolean) {
         const deja = el.className.indexOf('sta-visible') >= 0;
         if (visible && !deja) el.className += ' sta-visible';
@@ -275,7 +315,12 @@ export function renduDom(): Rendu {
     return {
         afficher(mode, attente, theme) {
             monter(theme);
-            if (!elements) return;
+            if (!elements || !racine) return;
+            // Une modale (Reka UI, Headless UI) cache aux lecteurs d'écran tout
+            // ce qui n'est pas elle, nous compris : l'annonce serait muette.
+            racine.removeAttribute('aria-hidden');
+            racine.removeAttribute('inert');
+            garderClavier(mode === 'voile');
             const { annonce, voile, message, detail, pastille, texte } = elements;
             if (mode === 'voile') {
                 message.textContent = attente.message;
@@ -289,6 +334,7 @@ export function renduDom(): Rendu {
             if (annonce.textContent !== attente.message) annonce.textContent = attente.message;
         },
         masquer() {
+            garderClavier(false);
             if (!elements) return;
             basculer(elements.voile, false);
             basculer(elements.pastille, false);

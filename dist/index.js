@@ -6,7 +6,7 @@
  * Un cœur sans framework et un branchement par façon de parler au serveur :
  * Inertia, axios, Livewire 2, pages classiques. Voir README.md.
  */
-export { chargeur, creerChargeur, renduDom, suivre } from './chargeur.js';
+export { chargeur, creerChargeur, renduDom, suivre, toucheBloquee } from './chargeur.js';
 export { voiture } from './voiture.js';
 export { FEUILLE, injecterStyles } from './styles.js';
 export { brancherInertia } from './inertia.js';

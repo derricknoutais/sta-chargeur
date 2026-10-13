@@ -20,8 +20,15 @@ Deux formes :
   de la même liste, une recherche pendant qu'on tape, une lecture de code.
 
 Rien sous **200 ms** (une navigation instantanée ne clignote pas), puis au
-moins **450 ms** à l'écran (pas d'éclair). Les attentes se cumulent : la plus
-récente parle ; le voile l'emporte sur la pastille.
+moins **450 ms** à l'écran (pas d'éclair), et encore **100 ms** de grâce avant
+de se retirer : une attente qui en enchaîne une autre (une requête lancée dans
+le `.then` de la précédente) le trouve encore là. Les attentes se cumulent : la
+plus récente parle ; le voile l'emporte sur la pastille.
+
+Le voile arrête aussi le **clavier** : Entrée ou Espace sur le bouton qui garde
+le focus relanceraient le geste en attente (trois appuis, trois paiements).
+Passent seulement Tab, les touches de fonction et les raccourcis du navigateur.
+Il ne s'imprime pas (`@media print`).
 
 Thème sombre (sous `.dark`, ou selon l'appareil), animations coupées pour qui
 les a désactivées (`prefers-reduced-motion`), annonce aux lecteurs d'écran.
@@ -252,6 +259,7 @@ chargeur({
     theme: 'classe', // 'classe' (sombre sous .dark) | 'systeme' | 'clair' | 'sombre'
     delai: 200, // ms avant d'afficher
     minimum: 450, // ms à l'écran, au moins
+    grace: 100, // ms encore, avant de se retirer
     messages: { voile: 'Chargement…', pastille: 'Mise à jour…' },
 });
 ```
@@ -342,13 +350,17 @@ rejouent des scénarios minutés (`?s=lent`, `?s=court`, `?s=rapide`,
 
 ## Versions
 
-- **v0.1.1** — redirection Inertia vers une autre adresse (409) : le voile
-  reste jusqu'au départ (« Redirection… ») ; requêtes axios annulées
+- **v0.1.1** — le voile arrête le clavier (Entrée répétée sous le voile :
+  trois paiements dans STA Compta) ; redirection Inertia vers une autre
+  adresse (409) : le voile reste jusqu'au départ (« Redirection… ») ; 100 ms
+  de grâce avant de se retirer (attentes enchaînées) ; requêtes axios annulées
   (`CancelToken`, `AbortController`) ; le voile bloque sous une modale qui
-  coupe les clics de `body` ; `suivre(promesse, { message, detail })` ;
-  messages dans la page (`data-sta-chargeur-message`, `-detail`) ;
-  `attendreDepart()` exporté. Relevés par les intégrations dans stapog,
-  Shipper et qbo-pass.
+  coupe les clics de `body`, et reste annoncé aux lecteurs d'écran ; jamais
+  imprimé ; phrase par méthode pour Inertia (« Enregistrement… »,
+  « Suppression… ») ; `suivre(promesse, { message, detail })` ; messages dans
+  la page (`data-sta-chargeur-message`, `-detail`) ; `attendreDepart()`
+  exporté. Relevés par les intégrations dans stapog, STA Compta, qbo-pass,
+  RentalPro et Shipper.
 - **v0.1.0** — première version, extraite de Storit.
 
 ## Faire évoluer le paquet

@@ -76,6 +76,7 @@
                 <a href="?page=3" data-sta-chargeur="non">Lien refusé (rien)</a>
             </div>
             <form method="post" action="?envoye=1" class="boutons"><button type="submit">Formulaire POST</button></form>
+            <div class="boutons"><button type="button" id="payer">Payer (0)</button></div>
 
             <h2 id="ancre">Galerie</h2>
             <div class="galerie" id="galerie"></div>
@@ -126,6 +127,15 @@
                 }),
             );
             document.getElementById('sombre').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+
+            // Sous le voile, Entrée sur ce bouton ne doit rien payer (`&focus` : il garde le focus).
+            let paiements = 0;
+            const payer = document.getElementById('payer');
+            payer.addEventListener('click', () => {
+                paiements += 1;
+                payer.textContent = `Payer (${paiements})`;
+            });
+            if (params.has('focus')) payer.focus();
 
             brancherNavigation();
 

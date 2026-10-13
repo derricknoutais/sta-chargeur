@@ -29,7 +29,11 @@ export interface OptionsInertia {
      * affichée (filtre, tri, pagination) → `pastille` ; le reste → `voile`.
      */
     classer?: (visite: Visite, parDefaut: Mode | null) => Mode | null;
-    /** Le message d'une visite ; `null` ou rien → celui par défaut. */
+    /**
+     * Le message d'une visite ; `null` ou rien → celui par défaut : sous le
+     * voile, « Enregistrement… » (POST, PUT, PATCH), « Suppression… »
+     * (DELETE), « Chargement… » (GET) ; sur la pastille, « Mise à jour… ».
+     */
     decrire?: (visite: Visite, mode: Mode) => Attente | null | undefined;
     /**
      * Ce qu'on dit quand le serveur renvoie vers une autre adresse
@@ -40,6 +44,15 @@ export interface OptionsInertia {
     /** Durée maximale d'une redirection qui ne quitte pas la page (téléchargement). Défaut : 15 000 ms. */
     securite?: number;
 }
+
+// Sous le voile, sans phrase de l'application : selon la méthode (GET garde
+// celle du chargeur, « Chargement… »).
+const MESSAGES: Record<string, string | undefined> = {
+    post: 'Enregistrement…',
+    put: 'Enregistrement…',
+    patch: 'Enregistrement…',
+    delete: 'Suppression…',
+};
 
 // Inertia 1, 2 et 3 notent une redirection vers une autre adresse sous cette
 // clé, juste avant de changer `window.location` ; la page suivante l'efface.
@@ -97,7 +110,10 @@ export function brancherInertia(router: RouteurInertia, options: OptionsInertia 
         const mode = options.classer ? options.classer(visite, parDefaut) : parDefaut;
         if (!mode) return;
 
-        const attente = (options.decrire && options.decrire(visite, mode)) || {};
+        const decrit: Attente = (options.decrire && options.decrire(visite, mode)) || {};
+        // Sans phrase de l'application, celle de la méthode — comme axios et la
+        // navigation : on enregistre, on supprime, on charge.
+        const attente: Attente = decrit.message || mode !== 'voile' ? decrit : { message: MESSAGES[visite.methode], detail: decrit.detail };
         const suivie = { fin: chargeur().attendre(mode, attente), marque: marqueRedirection() };
         suivies.set(brute, suivie);
         if (typeof brute.url === 'object') suivies.set(brute.url, suivie);
