@@ -53,6 +53,12 @@ travers le proxy LadderVPN (`127.0.0.1:9090`).
 Chaque application **monte de version explicitement** (`#v0.1.1`, …) : rien
 ne change chez elle sans qu'elle le décide.
 
+Le verrou (`package-lock.json`) note le paquet en `git+ssh://git@github.com/…` :
+un `npm ci` sur un serveur doit pouvoir lire ce dépôt privé (clé SSH du serveur
+reconnue par GitHub). Une application qui versionne son `public/build` (PullDB,
+Fidbak) n'en a pas besoin au déploiement ; celle qui construit sur le serveur
+(Storit) si.
+
 Un projet qui garde aussi un `yarn.lock` : `npm install` le réécrit au passage
 (même avec `--no-save`) — vérifier qu'il reste cohérent avec ce que le
 déploiement utilise, ou installer avec l'outil du projet.
@@ -104,7 +110,10 @@ brancherInertia(router, {
 `visite` : `{ methode, chemin, url, brute }` — `brute` est la visite propre à
 la version d'Inertia.
 
-### Vue 2 + Blade (Laravel Mix)
+### Vue 2 + Blade (Laravel Mix) — ou Vue 3 + Vite sans Inertia
+
+Valable pour toute application à pages Blade qui parle par axios, quels que
+soient Vue et l'outil de build (Fidbak v2 : Vue 3 + Vite 8, axios 1.7).
 
 Dans `resources/js/bootstrap.js`, après la création de `window.axios` :
 
@@ -114,6 +123,12 @@ import { brancherAxios, brancherNavigation } from '@derricknoutais/sta-chargeur'
 brancherAxios(window.axios);
 brancherNavigation();
 ```
+
+⚠️ Brancher **avant** tout intercepteur de réponse qui peut ne jamais rendre
+la main — un gardien de session qui, sur un 401/419, redirige et rend une
+promesse sans fin : les intercepteurs de réponse s'exécutent dans l'ordre où
+on les pose, et posé après lui, le chargeur ne verrait jamais la fin de la
+requête (voile coincé).
 
 Par défaut, une requête GET → pastille « Chargement… » ; POST, PUT, PATCH →
 voile « Enregistrement… » ; DELETE → voile « Suppression… ». Les visites
