@@ -1,0 +1,32 @@
+{
+    "name": "@derricknoutais/sta-chargeur",
+    "version": "0.1.0",
+    "description": "Le chargeur de la suite STA : la voiture du logo, roues qui tournent, pour toute attente — Inertia, axios, Livewire 2 ou pages classiques. Compatible avec le WebView Chrome 62 des terminaux Sunmi.",
+    "type": "module",
+    "private": true,
+    "license": "UNLICENSED",
+    "author": "Derrick Noutais",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "sideEffects": false,
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "test": "npm run build && node --test test/*.test.mjs",
+        "demo": "python3 -m http.server 8766 --bind 127.0.0.1"
+    },
+    "devDependencies": {
+        "typescript": "5.9.3"
+    }
+}

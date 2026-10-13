@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "target": "ES2015",
+        "module": "ES2015",
+        "moduleResolution": "bundler",
+        "lib": ["ES2015", "ES2017.Object", "DOM"],
+        "strict": true,
+        "declaration": true,
+        "outDir": "dist",
+        "rootDir": "src",
+        "newLine": "lf",
+        "removeComments": false,
+        "skipLibCheck": true
+    },
+    "include": ["src"]
+}

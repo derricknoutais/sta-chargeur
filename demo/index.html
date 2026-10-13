@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Chargeur STA — démo</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 24px 16px;
+                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+                background: #f4f6f8;
+                color: #14253a;
+            }
+            .dark body {
+                background: #0b161b;
+                color: #e8eef2;
+            }
+            main {
+                max-width: 720px;
+                margin: 0 auto;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            p {
+                line-height: 1.5;
+            }
+            .boutons button,
+            .boutons a {
+                display: inline-block;
+                margin: 0 8px 8px 0;
+                padding: 8px 12px;
+                border: 1px solid #9fb2c6;
+                border-radius: 8px;
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                text-decoration: none;
+                cursor: pointer;
+            }
+            pre {
+                padding: 12px;
+                border-radius: 8px;
+                background: rgba(159, 178, 198, 0.18);
+                font-size: 12px;
+                white-space: pre-wrap;
+            }
+            .galerie {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+            .galerie > * {
+                margin: 0 24px 16px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>Chargeur STA</h1>
+            <p>
+                Paramètres d'adresse : <code>?s=lent|court|rapide|interrompu|pastille|transition</code> pour un scénario minuté,
+                <code>?fixe=voile|pastille</code> pour figer l'affichage, <code>&amp;sombre</code> pour la classe <code>dark</code>,
+                <code>&amp;theme=systeme|sombre|clair</code> pour le thème du chargeur.
+            </p>
+
+            <div class="boutons">
+                <button type="button" data-attente="voile" data-duree="1500" data-message="Écriture dans Lightspeed…" data-detail="Les stocks sont mis à jour, ventes déduites. Ne quittez pas cette page.">Voile 1,5 s</button>
+                <button type="button" data-attente="pastille" data-duree="1200" data-message="Recherche…">Pastille 1,2 s</button>
+                <button type="button" data-attente="voile" data-duree="120">Voile 120 ms (rien)</button>
+                <button type="button" id="sombre">Basculer .dark</button>
+                <a href="?page=2">Lien vers une autre page</a>
+                <a href="#ancre">Ancre (rien)</a>
+                <a href="/export.xlsx">Export .xlsx (rien)</a>
+                <a href="?page=3" data-sta-chargeur="non">Lien refusé (rien)</a>
+            </div>
+            <form method="post" action="?envoye=1" class="boutons"><button type="submit">Formulaire POST</button></form>
+
+            <h2 id="ancre">Galerie</h2>
+            <div class="galerie" id="galerie"></div>
+
+            <h2>Journal</h2>
+            <pre id="journal"></pre>
+        </main>
+
+        <script type="module">
+            import { brancherNavigation, chargeur, voiture } from '../dist/index.js';
+
+            const params = new URLSearchParams(location.search);
+            if (params.has('sombre')) document.documentElement.classList.add('dark');
+            const theme = params.get('theme') || 'classe';
+            const c = chargeur({ theme });
+
+            // Le journal note chaque changement d'affichage, en millisecondes.
+            const t0 = performance.now();
+            const journal = document.getElementById('journal');
+            const noter = (texte) => {
+                journal.textContent += `${Math.round(performance.now() - t0)} ms — ${texte}\n`;
+            };
+            // Ce qui est vraiment à l'écran : on observe les classes du chargeur
+            // (requestAnimationFrame s'arrête quand l'onglet est caché).
+            let dernier = '';
+            const releve = () => {
+                const voile = document.querySelector('.sta-chargeur .sta-voile.sta-visible');
+                const pastille = document.querySelector('.sta-chargeur .sta-pastille.sta-visible');
+                const courant = voile
+                    ? `voile « ${voile.querySelector('.sta-message').textContent} »`
+                    : pastille
+                      ? `pastille « ${pastille.querySelector('.sta-pastille-texte').textContent} »`
+                      : 'rien';
+                if (courant === dernier) return;
+                dernier = courant;
+                noter(courant);
+            };
+            new MutationObserver(releve).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true, characterData: true });
+            releve();
+
+            document.getElementById('galerie').innerHTML =
+                voiture({ largeur: 240, theme }) + voiture({ largeur: 64, slogan: false, theme }) + voiture({ largeur: 120, anime: false, theme });
+
+            document.querySelectorAll('[data-attente]').forEach((b) =>
+                b.addEventListener('click', () => {
+                    const fin = c.attendre(b.dataset.attente, { message: b.dataset.message, detail: b.dataset.detail });
+                    setTimeout(fin, Number(b.dataset.duree));
+                }),
+            );
+            document.getElementById('sombre').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+
+            brancherNavigation();
+
+            const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+            const scenarios = {
+                lent: async () => {
+                    const fin = c.attendre('voile', { message: 'Écriture dans Lightspeed…', detail: 'Ne quittez pas cette page.' });
+                    await attendre(1500);
+                    fin();
+                },
+                court: async () => {
+                    const fin = c.attendre('voile');
+                    await attendre(260);
+                    fin();
+                },
+                rapide: async () => {
+                    const fin = c.attendre('voile');
+                    await attendre(120);
+                    fin();
+                },
+                interrompu: async () => {
+                    const a = c.attendre('voile', { message: 'Première visite…' });
+                    await attendre(150);
+                    a();
+                    const b = c.attendre('voile', { message: 'Seconde visite…' });
+                    await attendre(1000);
+                    b();
+                },
+                pastille: async () => {
+                    const fin = c.attendre('pastille', { message: 'Recherche…' });
+                    await attendre(1200);
+                    fin();
+                },
+                transition: async () => {
+                    const p = c.attendre('pastille', { message: 'Recherche…' });
+                    await attendre(500);
+                    const v = c.attendre('voile', { message: 'Lancement du récurrent…', detail: 'Le stocktake est créé dans Lightspeed.' });
+                    await attendre(900);
+                    v();
+                    p();
+                },
+            };
+            const s = params.get('s');
+            if (s && scenarios[s]) scenarios[s]().then(() => noter('scénario terminé'));
+
+            const fixe = params.get('fixe');
+            if (fixe) c.attendre(fixe, fixe === 'voile' ? { message: 'Écriture dans Lightspeed…', detail: 'Les stocks sont mis à jour, ventes déduites. Ne quittez pas cette page.' } : { message: 'Lecture du code…' });
+        </script>
+    </body>
+</html>

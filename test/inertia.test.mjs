@@ -1,0 +1,124 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, test } from 'node:test';
+import { arreterHorloge, avancer, horloge } from './outils.mjs';
+
+globalThis.window = { location: new URL('https://storit.test/revue/19') };
+const { brancherInertia, chargeur } = await import('../dist/index.js');
+
+beforeEach(horloge);
+afterEach(arreterHorloge);
+
+/**
+ * Un faux routeur. `copie` : comme Inertia 1, `finish` reçoit une copie de la
+ * visite (`{ ...visite }`) ; sinon le même objet, comme Inertia 2 et 3.
+ */
+function routeur({ copie = false } = {}) {
+    const ecouteurs = { start: [], finish: [] };
+    return {
+        on(nom, rappel) {
+            ecouteurs[nom].push(rappel);
+            return () => (ecouteurs[nom] = ecouteurs[nom].filter((r) => r !== rappel));
+        },
+        visiter(champs) {
+            const visite = { method: 'get', showProgress: true, prefetch: false, ...champs, url: new URL(champs.url, 'https://storit.test') };
+            ecouteurs.start.forEach((r) => r({ detail: { visit: visite } }));
+            const active = copie ? { ...visite, cancelToken: {} } : visite;
+            return () => ecouteurs.finish.forEach((r) => r({ detail: { visit: active } }));
+        },
+    };
+}
+
+async function attendreFin() {
+    await avancer(1000);
+    assert.equal(chargeur().etat().affiche, null);
+}
+
+for (const [version, copie] of [
+    ['Inertia 1 (finish reçoit une copie)', true],
+    ['Inertia 2 et 3 (même objet)', false],
+]) {
+    test(`${version} : voile pendant une visite vers une autre page, retiré à la fin`, async () => {
+        const r = routeur({ copie });
+        const debrancher = brancherInertia(r);
+        const fin = r.visiter({ url: '/comptage/12' });
+        await avancer(300);
+        assert.equal(chargeur().etat().affiche, 'voile');
+        fin();
+        await attendreFin();
+        debrancher();
+    });
+}
+
+test('un GET vers la page affichée (filtre, pagination) : pastille', async () => {
+    const r = routeur();
+    const debrancher = brancherInertia(r);
+    const fin = r.visiter({ url: '/revue/19?page=2' });
+    await avancer(300);
+    assert.equal(chargeur().etat().affiche, 'pastille');
+    fin();
+    await attendreFin();
+    debrancher();
+});
+
+test('préchargement et visites sans progression : rien', async () => {
+    const r = routeur();
+    const debrancher = brancherInertia(r);
+    const a = r.visiter({ url: '/comptage/3', prefetch: true });
+    const b = r.visiter({ url: '/comptage/4', showProgress: false });
+    await avancer(300);
+    assert.equal(chargeur().etat().affiche, null);
+    assert.equal(chargeur().etat().voiles, 0);
+    a();
+    b();
+    debrancher();
+});
+
+test("Inertia 1 n'a ni prefetch ni showProgress : ses visites comptent", async () => {
+    const r = routeur({ copie: true });
+    const debrancher = brancherInertia(r);
+    const fin = r.visiter({ url: '/sync', method: 'post', showProgress: undefined, prefetch: undefined });
+    await avancer(300);
+    assert.equal(chargeur().etat().affiche, 'voile');
+    fin();
+    await attendreFin();
+    debrancher();
+});
+
+test("decrire donne le message, classer peut écarter une visite", async () => {
+    const r = routeur();
+    const debrancher = brancherInertia(r, {
+        decrire: (v) => (v.methode === 'post' && /\/valider$/.test(v.chemin) ? { message: 'Écriture dans Lightspeed…', detail: 'Ne quittez pas.' } : null),
+        classer: (v, parDefaut) => (v.chemin === '/etat-sync' ? null : parDefaut),
+    });
+    const a = r.visiter({ url: '/revue/19/valider', method: 'post' });
+    const b = r.visiter({ url: '/etat-sync' });
+    await avancer(300);
+    assert.deepEqual(chargeur().etat(), { affiche: 'voile', voiles: 1, pastilles: 0, message: 'Écriture dans Lightspeed…' });
+    a();
+    b();
+    await attendreFin();
+    debrancher();
+});
+
+test('une visite interrompue par la suivante ne laisse rien derrière elle', async () => {
+    const r = routeur({ copie: true });
+    const debrancher = brancherInertia(r);
+    const a = r.visiter({ url: '/a' });
+    await avancer(250);
+    a();
+    const b = r.visiter({ url: '/b' });
+    await avancer(250);
+    b();
+    await attendreFin();
+    assert.equal(chargeur().etat().voiles, 0);
+    debrancher();
+});
+
+test('débrancher retire les écouteurs', async () => {
+    const r = routeur();
+    brancherInertia(r)();
+    const fin = r.visiter({ url: '/x' });
+    await avancer(300);
+    assert.equal(chargeur().etat().affiche, null);
+    fin();
+});
