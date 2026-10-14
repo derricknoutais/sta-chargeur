@@ -5,7 +5,9 @@ Azimuts » — roues qui tournent, caisse qui vibre, échappement qui fume, rout
 qui défile. Toute attente se voit, dans toutes les applications, de la même
 façon.
 
-Extrait de Storit le 14/10/2026. Dépôt privé `derricknoutais/sta-chargeur`.
+Extrait de Storit le 14/10/2026. Dépôt **public** `derricknoutais/sta-chargeur`
+(depuis le 14/10/2026), licence fermée (`UNLICENSED`) : code visible, pas
+réutilisable par des tiers.
 
 ## Ce qu'il fait
 
@@ -52,26 +54,20 @@ l'application parle au serveur.
 npm install github:derricknoutais/sta-chargeur#v0.1.1
 ```
 
-Le dépôt est **privé** : `npm` le récupère par git, avec les identifiants de
-la machine (trousseau macOS en local ; le serveur Forge de STA lit déjà les
-dépôts privés de Derrick). Depuis le Mac de Derrick, GitHub ne répond qu'à
+Le dépôt est public : aucune clé à fournir, ni en local, ni sur un serveur, ni
+dans l'intégration continue. Depuis le Mac de Derrick, GitHub ne répond qu'à
 travers le proxy LadderVPN (`127.0.0.1:9090`).
 
 Chaque application **monte de version explicitement** (`#v0.1.1`, …) : rien
 ne change chez elle sans qu'elle le décide.
 
 Le verrou (`package-lock.json`) note le paquet en `git+ssh://git@github.com/…` :
-un `npm ci` sur un serveur doit pouvoir lire ce dépôt privé (clé SSH du serveur
-reconnue par GitHub). Une application qui versionne son `public/build` (PullDB,
-Fidbak) n'en a pas besoin au déploiement ; celle qui construit sur le serveur
-(Storit) si.
+c'est cosmétique, npm passe par HTTPS pour un dépôt public (vérifié avec
+sunmi-scan : `npm ci` sur cache vide, sans clé SSH).
 
 **pnpm** réécrit la dépendance en `git+https://…/sta-chargeur.git` **sans** le
 `#vX.Y.Z` : remettre `github:derricknoutais/sta-chargeur#vX.Y.Z` à la main dans
 `package.json`. **yarn** : `yarn add github:derricknoutais/sta-chargeur#vX.Y.Z`.
-
-L'intégration continue (GitHub Actions qui fait `npm i`) a besoin, elle aussi,
-d'un accès en lecture au dépôt privé — clé de déploiement ou jeton.
 
 Un projet qui garde aussi un `yarn.lock` : `npm install` le réécrit au passage
 (même avec `--no-save`) — vérifier qu'il reste cohérent avec ce que le
