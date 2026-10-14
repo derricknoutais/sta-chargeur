@@ -188,7 +188,11 @@ export function brancherNavigation(options = {}) {
             // seconde attente remplacerait seulement la phrase la plus juste.
             if (departEnCours())
                 return;
-            const fin = partir({ type: 'code', methode: depart.methode, url: depart.url, element: document.documentElement }, null, depart.rechargement ? 'Rechargement de la page…' : undefined);
+            // Le formulaire d'un `form.submit()` porte ses attributs
+            // data-sta-chargeur-* comme un envoi ordinaire ; sinon, `<html>`.
+            const source = evenement.sourceElement;
+            const element = source && typeof source.closest === 'function' ? source : document.documentElement;
+            const fin = partir({ type: 'code', methode: depart.methode, url: depart.url, element }, null, depart.rechargement ? 'Rechargement de la page…' : undefined);
             // Une navigation interrompue (une autre la remplace, Échap) : on retire.
             if (evenement.signal && typeof evenement.signal.addEventListener === 'function')
                 evenement.signal.addEventListener('abort', fin);

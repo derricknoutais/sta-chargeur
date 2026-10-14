@@ -181,8 +181,9 @@ import { attendreDepart } from '@derricknoutais/sta-chargeur';
 
 attendreDepart({ message: 'Création du contrat…' });
 window.location.href = `/contrats/${id}`;
-``` Il ignore d'office
-ce que l'application a déjà intercepté (`preventDefault` : `@click.prevent`,
+```
+
+Il ignore d'office ce que l'application a déjà intercepté (`preventDefault` : `@click.prevent`,
 `@submit.prevent`, `wire:submit.prevent`, les `<Link>` d'Inertia), les nouveaux
 onglets (`target="_blank"`, Ctrl/Cmd-clic), les ancres, les autres sites, les
 fichiers (`.pdf`, `.xlsx`, `.csv`…) et les liens `download`. Les méthodes
@@ -361,7 +362,9 @@ rejouent des scénarios minutés (`?s=lent`, `?s=court`, `?s=rapide`,
   annoncé (la redirection d'Inertia gardait « Chargement… » au lieu de
   « Redirection… ») ; `brancherInertia` lit la méthode simulée par Laravel
   (`?_method=` de Wayfinder, `_method` des données) : « Suppression… » pour un
-  DELETE envoyé en POST. Relevés par l'intégration dans stapog.
+  DELETE envoyé en POST ; un `form.submit()` lit les `data-sta-chargeur-*` de
+  son formulaire (`sourceElement`, Chrome 112+) ; le filet de 15 s d'un départ
+  tombe avec lui. Relevés par les intégrations dans stapog et Shipper.
 - **v0.1.1** — le voile arrête le clavier (Entrée répétée sous le voile :
   trois paiements dans STA Compta) ; redirection Inertia vers une autre
   adresse (409) : le voile reste jusqu'au départ (« Redirection… ») ; 100 ms

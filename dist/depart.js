@@ -16,14 +16,19 @@ let ecoute = false;
 export function attendreDepart(attente, securite = SECURITE) {
     ecouterRetour();
     const terminer = chargeur().attendre('voile', attente);
+    // Le filet tombe avec un départ retiré avant l'heure : un minuteur oublié
+    // garderait en vie un processus de test, 15 s durant.
+    let filet;
     const fin = () => {
+        if (filet !== undefined)
+            clearTimeout(filet);
         const i = enCours.indexOf(fin);
         if (i >= 0)
             enCours.splice(i, 1);
         terminer();
     };
     enCours.push(fin);
-    setTimeout(fin, securite);
+    filet = setTimeout(fin, securite);
     return fin;
 }
 /** Un départ est-il déjà sous le voile ? Un second ne ferait que changer sa phrase. */

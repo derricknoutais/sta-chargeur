@@ -8,7 +8,7 @@ export interface Navigation {
     /** `get`, `post` — ou la méthode simulée par Laravel (`_method`) : `put`, `patch`, `delete`. */
     methode: string;
     url: URL;
-    /** Le lien ou le formulaire ; pour un départ du code, `<html>`. */
+    /** Le lien ou le formulaire ; pour un départ du code, le formulaire de `form.submit()` (Chrome 112+), sinon `<html>`. */
     element: Element;
 }
 
@@ -133,6 +133,8 @@ interface EvenementNavigate {
     destination?: { url: string; sameDocument?: boolean };
     defaultPrevented?: boolean;
     signal?: { addEventListener?: (type: string, rappel: () => void) => void };
+    /** Le formulaire d'un `form.submit()` (Chrome 112+) ; `null` pour `location.href = …`. */
+    sourceElement?: Element | null;
 }
 
 /**
@@ -256,8 +258,12 @@ export function brancherNavigation(options: OptionsNavigation = {}): () => void 
             // formulaire envoyé par requestSubmit() : le voile est là, et une
             // seconde attente remplacerait seulement la phrase la plus juste.
             if (departEnCours()) return;
+            // Le formulaire d'un `form.submit()` porte ses attributs
+            // data-sta-chargeur-* comme un envoi ordinaire ; sinon, `<html>`.
+            const source = evenement.sourceElement;
+            const element = source && typeof source.closest === 'function' ? source : document.documentElement;
             const fin = partir(
-                { type: 'code', methode: depart.methode, url: depart.url, element: document.documentElement },
+                { type: 'code', methode: depart.methode, url: depart.url, element },
                 null,
                 depart.rechargement ? 'Rechargement de la page…' : undefined,
             );

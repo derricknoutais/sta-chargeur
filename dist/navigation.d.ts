@@ -6,7 +6,7 @@ export interface Navigation {
     /** `get`, `post` — ou la méthode simulée par Laravel (`_method`) : `put`, `patch`, `delete`. */
     methode: string;
     url: URL;
-    /** Le lien ou le formulaire ; pour un départ du code, `<html>`. */
+    /** Le lien ou le formulaire ; pour un départ du code, le formulaire de `form.submit()` (Chrome 112+), sinon `<html>`. */
     element: Element;
 }
 export interface OptionsNavigation {
@@ -83,6 +83,8 @@ interface EvenementNavigate {
     signal?: {
         addEventListener?: (type: string, rappel: () => void) => void;
     };
+    /** Le formulaire d'un `form.submit()` (Chrome 112+) ; `null` pour `location.href = …`. */
+    sourceElement?: Element | null;
 }
 /**
  * Où part la page quand le code la fait partir, ou `null` si ce départ ne la
