@@ -28,6 +28,14 @@ export interface Options {
     grace?: number;
     /** Défaut : `classe` (sombre sous `.dark`). */
     theme?: Theme;
+    /**
+     * Arrêter le clavier dès qu'une attente « voile » commence — avant même
+     * que le voile ne se dessine : trois Entrée à 60 ms d'écart passaient
+     * pendant les 200 ms d'attente (trois paiements dans STA Compta). Une
+     * saisie rapide qui enchaîne les envois (douchette, pavé numérique) doit
+     * passer en pastille, qui ne bloque rien. Défaut : oui.
+     */
+    clavier?: boolean;
     /** Les messages quand l'attente n'en donne pas. */
     messages?: {
         voile?: string;
@@ -41,6 +49,8 @@ export interface Rendu {
         detail: string | null;
     }, theme: Theme): void;
     masquer(): void;
+    /** Arrête (vrai) ou rend (faux) le clavier ; facultatif pour un rendu de test. */
+    garder?(actif: boolean): void;
 }
 export interface Chargeur {
     /**

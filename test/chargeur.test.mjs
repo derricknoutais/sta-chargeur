@@ -166,3 +166,59 @@ test('sous le voile, le clavier ne passe pas — sauf Tab, F5 et les raccourcis 
     assert.equal(toucheBloquee({ key: 'r', metaKey: true }), false);
     assert.equal(toucheBloquee({ key: 'r', ctrlKey: true }), false);
 });
+
+/** Un rendu de test qui note aussi la garde du clavier. */
+function fauxGarde() {
+    const rendu = faux();
+    rendu.gardes = [];
+    rendu.garder = (actif) => {
+        const dernier = rendu.gardes[rendu.gardes.length - 1];
+        if (!dernier || dernier.actif !== actif) rendu.gardes.push({ t: Date.now(), actif });
+    };
+    return rendu;
+}
+
+test("le clavier s'arrête dès le début d'une attente « voile », avant que le voile ne se dessine", async () => {
+    const rendu = fauxGarde();
+    const c = creerChargeur({}, rendu);
+    const fin = c.attendre('voile');
+    await avancer(60);
+    // Trois Entrée à 60 ms d'écart passaient pendant les 200 ms d'attente.
+    assert.deepEqual(rendu.gardes, [{ t: 0, actif: true }]);
+    assert.deepEqual(rendu.journal, []);
+    await avancer(60);
+    fin();
+    await avancer(500);
+    // Attente brève : rien n'a été dessiné, et le clavier est rendu à la fin.
+    assert.deepEqual(rendu.journal, []);
+    assert.deepEqual(rendu.gardes, [{ t: 0, actif: true }, { t: 120, actif: false }]);
+});
+
+test("une fois dessiné, le voile garde le clavier jusqu'à son retrait — la pastille, jamais", async () => {
+    const rendu = fauxGarde();
+    const c = creerChargeur({}, rendu);
+    const p = c.attendre('pastille');
+    await avancer(300);
+    assert.deepEqual(rendu.gardes, [{ t: 0, actif: false }]);
+    p();
+    await avancer(1000);
+    const v = c.attendre('voile');
+    await avancer(400);
+    v();
+    await avancer(1000);
+    const masque = rendu.journal.filter((e) => e.quoi === 'masquer').pop();
+    assert.deepEqual(rendu.gardes.slice(-2), [
+        { t: 1300, actif: true },
+        { t: masque.t, actif: false },
+    ]);
+});
+
+test('clavier: false — la garde ne s’arme jamais', async () => {
+    const rendu = fauxGarde();
+    const c = creerChargeur({ clavier: false }, rendu);
+    const v = c.attendre('voile');
+    await avancer(300);
+    v();
+    await avancer(1000);
+    assert.ok(rendu.gardes.every((g) => g.actif === false));
+});

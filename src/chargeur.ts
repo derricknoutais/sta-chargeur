@@ -32,6 +32,14 @@ export interface Options {
     grace?: number;
     /** Défaut : `classe` (sombre sous `.dark`). */
     theme?: Theme;
+    /**
+     * Arrêter le clavier dès qu'une attente « voile » commence — avant même
+     * que le voile ne se dessine : trois Entrée à 60 ms d'écart passaient
+     * pendant les 200 ms d'attente (trois paiements dans STA Compta). Une
+     * saisie rapide qui enchaîne les envois (douchette, pavé numérique) doit
+     * passer en pastille, qui ne bloque rien. Défaut : oui.
+     */
+    clavier?: boolean;
     /** Les messages quand l'attente n'en donne pas. */
     messages?: { voile?: string; pastille?: string };
 }
@@ -40,6 +48,8 @@ export interface Options {
 export interface Rendu {
     afficher(mode: Mode, attente: { message: string; detail: string | null }, theme: Theme): void;
     masquer(): void;
+    /** Arrête (vrai) ou rend (faux) le clavier ; facultatif pour un rendu de test. */
+    garder?(actif: boolean): void;
 }
 
 export interface Chargeur {
@@ -65,7 +75,7 @@ interface Entree {
     detail: string | null;
 }
 
-const PAR_DEFAUT = { delai: 200, minimum: 450, grace: 100, theme: 'classe' as Theme, voile: 'Chargement…', pastille: 'Mise à jour…' };
+const PAR_DEFAUT = { delai: 200, minimum: 450, grace: 100, theme: 'classe' as Theme, clavier: true, voile: 'Chargement…', pastille: 'Mise à jour…' };
 
 /**
  * Crée un chargeur indépendant. Les applications n'en veulent qu'un par page :
@@ -80,6 +90,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
         if (o.minimum !== undefined) reglages.minimum = o.minimum;
         if (o.grace !== undefined) reglages.grace = o.grace;
         if (o.theme !== undefined) reglages.theme = o.theme;
+        if (o.clavier !== undefined) reglages.clavier = o.clavier;
         if (o.messages && o.messages.voile) reglages.voile = o.messages.voile;
         if (o.messages && o.messages.pastille) reglages.pastille = o.messages.pastille;
     }
@@ -103,7 +114,14 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
 
     const demande = (): Mode | null => (derniere('voile') ? 'voile' : derniere('pastille') ? 'pastille' : null);
 
+    // Le clavier s'arrête dès qu'un voile est demandé — pas seulement quand il
+    // se dessine, 200 ms plus tard — et jusqu'à ce qu'il soit retiré.
+    function garder() {
+        if (rendu.garder) rendu.garder(reglages.clavier && (demande() === 'voile' || affiche === 'voile'));
+    }
+
     function dessiner() {
+        garder();
         if (!affiche) {
             montre = null;
             rendu.masquer();
@@ -129,6 +147,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
 
     function evaluer() {
         const mode = demande();
+        garder();
 
         if (mode) {
             if (minuteurMasquage !== undefined) {
@@ -146,7 +165,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
                 minuteurAffichage = setTimeout(() => {
                     minuteurAffichage = undefined;
                     const m = demande();
-                    if (!m) return;
+                    if (!m) return garder();
                     affiche = m;
                     afficheDepuis = Date.now();
                     dessiner();
@@ -170,7 +189,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
         if (minuteurMasquage === undefined) {
             minuteurMasquage = setTimeout(() => {
                 minuteurMasquage = undefined;
-                if (demande()) return;
+                if (demande()) return garder();
                 affiche = null;
                 dessiner();
             }, reste);
@@ -211,6 +230,7 @@ export function creerChargeur(options: Options = {}, rendu: Rendu = renduDom()):
         configurer(o: Options) {
             appliquer(o);
             if (affiche) dessiner();
+            else garder();
         },
         etat() {
             return {
@@ -275,6 +295,13 @@ export function renduDom(): Rendu {
                 voiture({ largeur: 64, slogan: false, theme }) +
                 '<span class="sta-pastille-texte"></span></div>';
             const q = (sel: string) => racine!.querySelector(sel) as HTMLElement;
+            // Une pression sur le voile ne remonte pas jusqu'au document : une
+            // modale ouverte dessous (Reka UI) la prendrait pour un clic à
+            // l'extérieur, et se fermerait pendant l'écriture.
+            const voile = q('.sta-voile');
+            for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click']) {
+                voile.addEventListener(type, (e: Event) => e.stopPropagation());
+            }
             elements = {
                 annonce: q('.sta-annonce'),
                 voile: q('.sta-voile'),
@@ -298,7 +325,7 @@ export function renduDom(): Rendu {
         evenement.stopPropagation();
     };
     function garderClavier(actif: boolean) {
-        if (actif === clavierGarde || typeof window === 'undefined') return;
+        if (actif === clavierGarde || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
         clavierGarde = actif;
         for (const type of EVENEMENTS_CLAVIER) {
             if (actif) window.addEventListener(type, garde as EventListener, true);
@@ -320,7 +347,6 @@ export function renduDom(): Rendu {
             // ce qui n'est pas elle, nous compris : l'annonce serait muette.
             racine.removeAttribute('aria-hidden');
             racine.removeAttribute('inert');
-            garderClavier(mode === 'voile');
             const { annonce, voile, message, detail, pastille, texte } = elements;
             if (mode === 'voile') {
                 message.textContent = attente.message;
@@ -334,11 +360,13 @@ export function renduDom(): Rendu {
             if (annonce.textContent !== attente.message) annonce.textContent = attente.message;
         },
         masquer() {
-            garderClavier(false);
             if (!elements) return;
             basculer(elements.voile, false);
             basculer(elements.pastille, false);
             elements.annonce.textContent = '';
+        },
+        garder(actif: boolean) {
+            garderClavier(actif);
         },
     };
 }

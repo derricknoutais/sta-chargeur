@@ -134,6 +134,10 @@
             payer.addEventListener('click', () => {
                 paiements += 1;
                 payer.textContent = `Payer (${paiements})`;
+                // Comme un POST : un voile pendant une seconde. Des Entrée
+                // répétées pendant ce temps ne doivent rien payer de plus.
+                const fin = c.attendre('voile', { message: 'Paiement…' });
+                setTimeout(fin, 1000);
             });
             if (params.has('focus')) payer.focus();
 

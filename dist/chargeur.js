@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { injecterStyles } from './styles.js';
 import { voiture } from './voiture.js';
-const PAR_DEFAUT = { delai: 200, minimum: 450, grace: 100, theme: 'classe', voile: 'Chargement…', pastille: 'Mise à jour…' };
+const PAR_DEFAUT = { delai: 200, minimum: 450, grace: 100, theme: 'classe', clavier: true, voile: 'Chargement…', pastille: 'Mise à jour…' };
 /**
  * Crée un chargeur indépendant. Les applications n'en veulent qu'un par page :
  * elles passent par `chargeur()`, que partagent tous les branchements.
@@ -26,6 +26,8 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
             reglages.grace = o.grace;
         if (o.theme !== undefined)
             reglages.theme = o.theme;
+        if (o.clavier !== undefined)
+            reglages.clavier = o.clavier;
         if (o.messages && o.messages.voile)
             reglages.voile = o.messages.voile;
         if (o.messages && o.messages.pastille)
@@ -49,7 +51,14 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
         return undefined;
     };
     const demande = () => (derniere('voile') ? 'voile' : derniere('pastille') ? 'pastille' : null);
+    // Le clavier s'arrête dès qu'un voile est demandé — pas seulement quand il
+    // se dessine, 200 ms plus tard — et jusqu'à ce qu'il soit retiré.
+    function garder() {
+        if (rendu.garder)
+            rendu.garder(reglages.clavier && (demande() === 'voile' || affiche === 'voile'));
+    }
     function dessiner() {
+        garder();
         if (!affiche) {
             montre = null;
             rendu.masquer();
@@ -75,6 +84,7 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
     }
     function evaluer() {
         const mode = demande();
+        garder();
         if (mode) {
             if (minuteurMasquage !== undefined) {
                 clearTimeout(minuteurMasquage);
@@ -92,7 +102,7 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
                     minuteurAffichage = undefined;
                     const m = demande();
                     if (!m)
-                        return;
+                        return garder();
                     affiche = m;
                     afficheDepuis = Date.now();
                     dessiner();
@@ -116,7 +126,7 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
             minuteurMasquage = setTimeout(() => {
                 minuteurMasquage = undefined;
                 if (demande())
-                    return;
+                    return garder();
                 affiche = null;
                 dessiner();
             }, reste);
@@ -159,6 +169,8 @@ export function creerChargeur(options = {}, rendu = renduDom()) {
             appliquer(o);
             if (affiche)
                 dessiner();
+            else
+                garder();
         },
         etat() {
             return {
@@ -214,6 +226,13 @@ export function renduDom() {
                     voiture({ largeur: 64, slogan: false, theme }) +
                     '<span class="sta-pastille-texte"></span></div>';
             const q = (sel) => racine.querySelector(sel);
+            // Une pression sur le voile ne remonte pas jusqu'au document : une
+            // modale ouverte dessous (Reka UI) la prendrait pour un clic à
+            // l'extérieur, et se fermerait pendant l'écriture.
+            const voile = q('.sta-voile');
+            for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click']) {
+                voile.addEventListener(type, (e) => e.stopPropagation());
+            }
             elements = {
                 annonce: q('.sta-annonce'),
                 voile: q('.sta-voile'),
@@ -238,7 +257,7 @@ export function renduDom() {
         evenement.stopPropagation();
     };
     function garderClavier(actif) {
-        if (actif === clavierGarde || typeof window === 'undefined')
+        if (actif === clavierGarde || typeof window === 'undefined' || typeof window.addEventListener !== 'function')
             return;
         clavierGarde = actif;
         for (const type of EVENEMENTS_CLAVIER) {
@@ -264,7 +283,6 @@ export function renduDom() {
             // ce qui n'est pas elle, nous compris : l'annonce serait muette.
             racine.removeAttribute('aria-hidden');
             racine.removeAttribute('inert');
-            garderClavier(mode === 'voile');
             const { annonce, voile, message, detail, pastille, texte } = elements;
             if (mode === 'voile') {
                 message.textContent = attente.message;
@@ -280,12 +298,14 @@ export function renduDom() {
                 annonce.textContent = attente.message;
         },
         masquer() {
-            garderClavier(false);
             if (!elements)
                 return;
             basculer(elements.voile, false);
             basculer(elements.pastille, false);
             elements.annonce.textContent = '';
+        },
+        garder(actif) {
+            garderClavier(actif);
         },
     };
 }

@@ -27,10 +27,15 @@ de se retirer : une attente qui en enchaîne une autre (une requête lancée dan
 le `.then` de la précédente) le trouve encore là. Les attentes se cumulent : la
 plus récente parle ; le voile l'emporte sur la pastille.
 
-Le voile arrête aussi le **clavier** : Entrée ou Espace sur le bouton qui garde
-le focus relanceraient le geste en attente (trois appuis, trois paiements).
-Passent seulement Tab, les touches de fonction et les raccourcis du navigateur.
-Il ne s'imprime pas (`@media print`).
+Le voile arrête aussi le **clavier**, dès que l'attente commence — avant même
+de se dessiner : Entrée ou Espace sur le bouton qui garde le focus
+relanceraient le geste en attente (trois appuis à 60 ms d'écart, trois
+paiements). Passent seulement Tab, les touches de fonction et les raccourcis
+du navigateur. Une saisie rapide qui enchaîne les envois (douchette, pavé
+numérique) se classe donc en **pastille**, qui ne bloque rien
+(`chargeur({ clavier: false })` coupe la garde partout). Le voile absorbe aussi
+les pressions : une modale ouverte dessous ne les prend pas pour un clic à
+l'extérieur. Il ne s'imprime pas (`@media print`).
 
 Thème sombre (sous `.dark`, ou selon l'appareil), animations coupées pour qui
 les a désactivées (`prefers-reduced-motion`), annonce aux lecteurs d'écran.
@@ -268,6 +273,7 @@ chargeur({
     delai: 200, // ms avant d'afficher
     minimum: 450, // ms à l'écran, au moins
     grace: 100, // ms encore, avant de se retirer
+    clavier: true, // le voile arrête le clavier dès le début de l'attente
     messages: { voile: 'Chargement…', pastille: 'Mise à jour…' },
 });
 ```
@@ -364,7 +370,10 @@ rejouent des scénarios minutés (`?s=lent`, `?s=court`, `?s=rapide`,
   (`?_method=` de Wayfinder, `_method` des données) : « Suppression… » pour un
   DELETE envoyé en POST ; un `form.submit()` lit les `data-sta-chargeur-*` de
   son formulaire (`sourceElement`, Chrome 112+) ; le filet de 15 s d'un départ
-  tombe avec lui. Relevés par les intégrations dans stapog et Shipper.
+  tombe avec lui ; le clavier s'arrête dès le début d'une attente « voile »
+  (trois Entrée à 60 ms : trois paiements, mesuré dans STA Compta), option
+  `clavier` ; le voile absorbe les pressions (une modale Reka dessous se
+  fermait). Relevés par les intégrations dans stapog, Shipper et STA Compta.
 - **v0.1.1** — le voile arrête le clavier (Entrée répétée sous le voile :
   trois paiements dans STA Compta) ; redirection Inertia vers une autre
   adresse (409) : le voile reste jusqu'au départ (« Redirection… ») ; 100 ms
