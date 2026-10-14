@@ -10,7 +10,7 @@ export interface VisiteInertia {
 }
 /** La visite, simplifiée, telle que la reçoivent `classer` et `decrire`. */
 export interface Visite {
-    /** `get`, `post`, `put`, `patch`, `delete`. */
+    /** `get`, `post`, `put`, `patch`, `delete` — la méthode simulée (`_method`) l'emporte sur POST. */
     methode: string;
     /** `/revue/19/valider` — sans domaine ni paramètres. */
     chemin: string;

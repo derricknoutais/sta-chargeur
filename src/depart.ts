@@ -29,6 +29,11 @@ export function attendreDepart(attente: Attente, securite: number = SECURITE): (
     return fin;
 }
 
+/** Un départ est-il déjà sous le voile ? Un second ne ferait que changer sa phrase. */
+export function departEnCours(): boolean {
+    return enCours.length > 0;
+}
+
 // Retour arrière : le navigateur ressort la page de son cache, voile compris.
 function ecouterRetour() {
     if (ecoute || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;

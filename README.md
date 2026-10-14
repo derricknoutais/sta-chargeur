@@ -357,6 +357,11 @@ rejouent des scénarios minutés (`?s=lent`, `?s=court`, `?s=rapide`,
 
 ## Versions
 
+- **v0.1.2** — un départ lancé par le code ne double plus un départ déjà
+  annoncé (la redirection d'Inertia gardait « Chargement… » au lieu de
+  « Redirection… ») ; `brancherInertia` lit la méthode simulée par Laravel
+  (`?_method=` de Wayfinder, `_method` des données) : « Suppression… » pour un
+  DELETE envoyé en POST. Relevés par l'intégration dans stapog.
 - **v0.1.1** — le voile arrête le clavier (Entrée répétée sous le voile :
   trois paiements dans STA Compta) ; redirection Inertia vers une autre
   adresse (409) : le voile reste jusqu'au départ (« Redirection… ») ; 100 ms

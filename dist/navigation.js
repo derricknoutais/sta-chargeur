@@ -1,4 +1,4 @@
-import { attendreDepart, SECURITE } from './depart.js';
+import { attendreDepart, departEnCours, SECURITE } from './depart.js';
 /** Ce qui écarte un lien ou un formulaire : `data-sta-chargeur="non"` sur lui ou un ancêtre. */
 export const REFUS = '[data-sta-chargeur="non"]';
 // Un fichier qu'on télécharge ne quitte pas la page.
@@ -182,6 +182,11 @@ export function brancherNavigation(options = {}) {
         setTimeout(() => {
             // Un autre écouteur a pu l'annuler.
             if (evenement.defaultPrevented)
+                return;
+            // Déjà annoncé — une redirection d'Inertia (« Redirection… »), un
+            // formulaire envoyé par requestSubmit() : le voile est là, et une
+            // seconde attente remplacerait seulement la phrase la plus juste.
+            if (departEnCours())
                 return;
             const fin = partir({ type: 'code', methode: depart.methode, url: depart.url, element: document.documentElement }, null, depart.rechargement ? 'Rechargement de la page…' : undefined);
             // Une navigation interrompue (une autre la remplace, Échap) : on retire.

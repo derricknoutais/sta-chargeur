@@ -11,3 +11,5 @@ export declare const SECURITE = 15000;
  * Rend la fonction qui le retire avant l'heure.
  */
 export declare function attendreDepart(attente: Attente, securite?: number): () => void;
+/** Un départ est-il déjà sous le voile ? Un second ne ferait que changer sa phrase. */
+export declare function departEnCours(): boolean;

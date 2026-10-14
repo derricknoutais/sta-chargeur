@@ -1,5 +1,5 @@
 import { type Attente } from './chargeur.js';
-import { attendreDepart, SECURITE } from './depart.js';
+import { attendreDepart, departEnCours, SECURITE } from './depart.js';
 
 /** Un départ de page vu par `decrire`. */
 export interface Navigation {
@@ -252,6 +252,10 @@ export function brancherNavigation(options: OptionsNavigation = {}): () => void 
         setTimeout(() => {
             // Un autre écouteur a pu l'annuler.
             if (evenement.defaultPrevented) return;
+            // Déjà annoncé — une redirection d'Inertia (« Redirection… »), un
+            // formulaire envoyé par requestSubmit() : le voile est là, et une
+            // seconde attente remplacerait seulement la phrase la plus juste.
+            if (departEnCours()) return;
             const fin = partir(
                 { type: 'code', methode: depart.methode, url: depart.url, element: document.documentElement },
                 null,

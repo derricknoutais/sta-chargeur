@@ -158,6 +158,22 @@ test("une marque laissée par une redirection plus ancienne ne compte pas", asyn
     debrancher();
 });
 
+test('la méthode simulée par Laravel (_method dans l’adresse ou les données) l’emporte sur POST', async () => {
+    const r = routeur();
+    const vues = [];
+    const debrancher = brancherInertia(r, { classer: (v, parDefaut) => (vues.push(v.methode), parDefaut) });
+    const a = r.visiter({ url: '/settings/profile?_method=DELETE', method: 'post' });
+    const b = r.visiter({ url: '/clients/3', method: 'post', data: { _method: 'PATCH', nom: 'x' } });
+    const c = r.visiter({ url: '/clients', method: 'post', data: { nom: 'x' } });
+    await avancer(300);
+    assert.deepEqual(vues, ['delete', 'patch', 'post']);
+    a();
+    b();
+    c();
+    await avancer(1000);
+    debrancher();
+});
+
 test("sans phrase de l'application, celle de la méthode", async () => {
     const r = routeur();
     const debrancher = brancherInertia(r);

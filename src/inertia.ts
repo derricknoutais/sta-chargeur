@@ -13,7 +13,7 @@ export interface VisiteInertia {
 
 /** La visite, simplifiée, telle que la reçoivent `classer` et `decrire`. */
 export interface Visite {
-    /** `get`, `post`, `put`, `patch`, `delete`. */
+    /** `get`, `post`, `put`, `patch`, `delete` — la méthode simulée (`_method`) l'emporte sur POST. */
     methode: string;
     /** `/revue/19/valider` — sans domaine ni paramètres. */
     chemin: string;
@@ -72,9 +72,28 @@ interface RouteurInertia {
     on(evenement: any, rappel: (evenement: any) => any): any;
 }
 
+/**
+ * La méthode que Laravel verra : un formulaire envoyé en POST peut porter un
+ * PUT, un PATCH ou un DELETE simulé — `?_method=` dans l'adresse (Wayfinder,
+ * `<Form>` d'Inertia) ou `_method` dans les données.
+ */
+function methodeReelle(brute: VisiteInertia, url: URL): string {
+    const methode = String(brute.method || 'get').toLowerCase();
+    if (methode !== 'post') return methode;
+
+    let simulee: unknown = url.searchParams.get('_method');
+    const donnees = (brute as { data?: unknown }).data;
+    if (!simulee && donnees) {
+        if (typeof FormData !== 'undefined' && donnees instanceof FormData) simulee = donnees.get('_method');
+        else if (typeof donnees === 'object') simulee = (donnees as Record<string, unknown>)._method;
+    }
+
+    return typeof simulee === 'string' && simulee ? simulee.toLowerCase() : methode;
+}
+
 function simplifier(brute: VisiteInertia): Visite {
     const url = typeof brute.url === 'string' ? new URL(brute.url, window.location.href) : brute.url;
-    return { methode: String(brute.method || 'get').toLowerCase(), chemin: url.pathname, url, brute };
+    return { methode: methodeReelle(brute, url), chemin: url.pathname, url, brute };
 }
 
 function classerParDefaut(visite: Visite): Mode | null {
